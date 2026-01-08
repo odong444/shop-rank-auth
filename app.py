@@ -36,14 +36,22 @@ def init_db():
         id SERIAL PRIMARY KEY, user_id VARCHAR(50) NOT NULL,
         mid VARCHAR(50) NOT NULL, keyword VARCHAR(100) NOT NULL,
         title VARCHAR(500) DEFAULT '', mall VARCHAR(100) DEFAULT '',
-        first_rank VARCHAR(20) DEFAULT '-', prev_rank VARCHAR(20) DEFAULT '-',
-        current_rank VARCHAR(20) DEFAULT '-', last_checked TIMESTAMP,
+        current_rank VARCHAR(20) DEFAULT '-',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, mid, keyword))''')
     cur.execute('''CREATE TABLE IF NOT EXISTS rank_history (
         id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
         rank VARCHAR(20) NOT NULL, checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
+    
+    # 기존 테이블에 새 컬럼 추가 (각각 별도 트랜잭션)
+    for col in [("first_rank", "VARCHAR(20) DEFAULT '-'"), ("prev_rank", "VARCHAR(20) DEFAULT '-'"), ("last_checked", "TIMESTAMP")]:
+        try:
+            cur.execute(f"ALTER TABLE products ADD COLUMN {col[0]} {col[1]}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    
     cur.close()
     conn.close()
 
