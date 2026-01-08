@@ -21,6 +21,8 @@ NAVER_CLIENT_ID = "UrlniCJoGZ_jfgk5tlkN"
 NAVER_CLIENT_SECRET = "x3z9b1CM2F"
 KST = pytz.timezone('Asia/Seoul')
 
+ADMIN_PASSWORD = "02100210"
+
 def get_db():
     return psycopg.connect(DATABASE_URL)
 
@@ -240,6 +242,8 @@ loadProducts();
 
 @app.route('/admin')
 def admin_page():
+    if not session.get('admin_logged_in'):
+        return redirect('/admin/login')
     return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>회원 관리</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Malgun Gothic',sans-serif;background:#f5f5f5;padding:20px}
 .container{max-width:1000px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
@@ -247,8 +251,9 @@ h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collaps
 th{background:#4a90d9;color:#fff}tr:hover{background:#f9f9f9}.btn{padding:6px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px}
 .btn-approve{background:#28a745;color:#fff}.btn-reject{background:#ffc107}.btn-delete{background:#dc3545;color:#fff}
 .refresh-btn{display:block;margin:20px auto;padding:10px 30px;background:#4a90d9;color:#fff;border:none;border-radius:5px;cursor:pointer}
-.back-btn{display:inline-block;margin-bottom:20px;padding:8px 16px;background:#667eea;color:#fff;text-decoration:none;border-radius:5px}</style></head>
-<body><div class="container"><a href="/dashboard" class="back-btn">← 대시보드로</a><h1>🔐 회원 관리</h1>
+.back-btn{display:inline-block;margin-bottom:20px;padding:8px 16px;background:#667eea;color:#fff;text-decoration:none;border-radius:5px}
+.logout-btn{display:inline-block;margin-left:10px;padding:8px 16px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px}</style></head>
+<body><div class="container"><a href="/dashboard" class="back-btn">← 대시보드로</a><a href="/admin/logout" class="logout-btn">관리자 로그아웃</a><h1>🔐 회원 관리</h1>
 <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
 <table><thead><tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>승인</th><th>관리</th></tr></thead><tbody id="userTable"></tbody></table></div>
 <script>async function loadUsers(){try{const r=await fetch('/admin/users');const d=await r.json();if(d.success){const tbody=document.getElementById('userTable');tbody.innerHTML='';
@@ -259,6 +264,35 @@ d.users.forEach(u=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${u.
 async function setApproval(id,ap){const r=await fetch('/admin/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id,approved:ap})});const d=await r.json();if(d.success)loadUsers();else alert(d.message);}
 async function deleteUser(id){if(!confirm(id+' 회원을 삭제하시겠습니까?'))return;const r=await fetch('/admin/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id})});const d=await r.json();if(d.success)loadUsers();else alert(d.message);}
 loadUsers();</script></body></html>'''
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect('/admin')
+        else:
+            return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 로그인</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Malgun Gothic',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:90%;max-width:350px;text-align:center}
+h1{margin-bottom:20px;font-size:20px}input{width:100%;padding:15px;border:2px solid #e0e0e0;border-radius:10px;font-size:16px;margin-bottom:15px}
+input:focus{outline:none;border-color:#667eea}button{width:100%;padding:15px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer}
+.error{color:#c00;margin-bottom:15px}</style></head>
+<body><div class="container"><h1>🔐 관리자 로그인</h1><p class="error">비밀번호가 틀렸습니다.</p>
+<form method="POST"><input type="password" name="password" placeholder="관리자 비밀번호"><button type="submit">로그인</button></form></div></body></html>'''
+    
+    return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 로그인</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Malgun Gothic',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:90%;max-width:350px;text-align:center}
+h1{margin-bottom:20px;font-size:20px}input{width:100%;padding:15px;border:2px solid #e0e0e0;border-radius:10px;font-size:16px;margin-bottom:15px}
+input:focus{outline:none;border-color:#667eea}button{width:100%;padding:15px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer}</style></head>
+<body><div class="container"><h1>🔐 관리자 로그인</h1>
+<form method="POST"><input type="password" name="password" placeholder="관리자 비밀번호"><button type="submit">로그인</button></form></div></body></html>'''
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect('/admin/login')
 
 # ===== API =====
 
