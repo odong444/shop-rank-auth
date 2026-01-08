@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import psycopg2
+import psycopg
 import os
 from datetime import datetime
 
@@ -11,7 +11,7 @@ CORS(app)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg.connect(DATABASE_URL)
     return conn
 
 # 테이블 생성 (최초 1회)
