@@ -163,6 +163,7 @@ def dashboard_page():
 th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{color:#dc3545;font-weight:bold}}.rank-down{{color:#28a745;font-weight:bold}}
 .empty{{text-align:center;padding:60px 20px;color:#888}}.empty-icon{{font-size:50px;margin-bottom:15px}}.loading{{text-align:center;padding:40px;color:#666}}
 .spinner{{display:inline-block;width:30px;height:30px;border:3px solid #f3f3f3;border-top:3px solid #667eea;border-radius:50%;animation:spin 1s linear infinite}}
+.spinner-small{{display:inline-block;width:16px;height:16px;border:2px solid #f3f3f3;border-top:2px solid #667eea;border-radius:50%;animation:spin 1s linear infinite}}
 @keyframes spin{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(360deg)}}}}
 .modal{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:1000}}
 .modal-content{{background:#fff;padding:25px;border-radius:15px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto}}
@@ -181,11 +182,19 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 <header class="header"><h2>🛍️ 네이버 쇼핑 순위체크</h2><div style="font-size:14px;color:#666">👤 {name}님</div></header>
 <div class="content">
 <div class="card"><div class="card-header"><h3>➕ 상품 등록</h3></div>
-<div class="card-body"><div class="form-row">
+<div class="card-body">
+<div class="form-row" style="margin-bottom:15px">
 <input type="text" id="mid" placeholder="MID (상품번호)">
 <input type="text" id="keyword" placeholder="검색 키워드">
 <button onclick="addProduct()" id="addBtn">등록하기</button>
-</div><p style="margin-top:10px;font-size:12px;color:#888">* 등록 시 자동으로 순위가 조회됩니다</p></div></div>
+</div>
+<div class="form-row">
+<input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="padding:8px">
+<button onclick="bulkUpload()" id="bulkBtn" class="btn-secondary" style="background:#FF9800;color:#fff">📁 대량등록</button>
+<button onclick="downloadSample()" style="background:#6c757d;color:#fff">📥 샘플파일</button>
+</div>
+<p style="margin-top:10px;font-size:12px;color:#888">* 등록 후 순위가 자동으로 조회됩니다 (개별 로딩)</p>
+</div></div>
 <div class="card"><div class="card-header"><h3>📋 내 상품 목록 <span id="productCount" style="color:#667eea"></span></h3>
 <div class="btn-group">
 <button class="btn btn-success" onclick="exportExcel()">📥 엑셀 다운로드</button>
@@ -208,23 +217,48 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 let products=[];
 async function loadProducts(){{try{{const r=await fetch('/api/products');const d=await r.json();document.getElementById('loading').style.display='none';
 if(d.success&&d.products.length>0){{products=d.products;document.getElementById('tableContainer').style.display='block';document.getElementById('empty').style.display='none';
-document.getElementById('productCount').textContent=`(${{d.products.length}}개)`;const tbody=document.getElementById('productBody');tbody.innerHTML='';
-d.products.forEach(p=>{{const tr=document.createElement('tr');let todayHtml=formatRank(p.current_rank);
-if(p.prev_rank&&p.prev_rank!=='-'&&p.current_rank&&p.current_rank!=='-'&&p.current_rank!=='300위 밖'){{
+document.getElementById('productCount').textContent=`(${{d.products.length}}개)`;renderTable();checkPendingRanks();}}
+else{{products=[];document.getElementById('tableContainer').style.display='none';document.getElementById('empty').style.display='block';
+document.getElementById('productCount').textContent='(0개)';}}}}catch(e){{document.getElementById('loading').innerHTML='<p style="color:#c00">데이터 로드 실패</p>';}}}}
+
+function renderTable(){{const tbody=document.getElementById('productBody');tbody.innerHTML='';
+products.forEach(p=>{{const tr=document.createElement('tr');tr.id='row-'+p.id;
+let todayHtml=p.current_rank==='-'||p.current_rank==='loading'?'<div class="spinner-small"></div>':formatRank(p.current_rank);
+if(p.prev_rank&&p.prev_rank!=='-'&&p.current_rank&&p.current_rank!=='-'&&p.current_rank!=='300위 밖'&&p.current_rank!=='loading'){{
 const prev=parseInt(p.prev_rank),curr=parseInt(p.current_rank);if(!isNaN(prev)&&!isNaN(curr)){{const diff=prev-curr;
 if(diff>0)todayHtml+=` <span class="rank-down">▲${{diff}}</span>`;else if(diff<0)todayHtml+=` <span class="rank-up">▼${{Math.abs(diff)}}</span>`;}}}}
+let firstHtml=p.first_rank==='-'||p.first_rank==='loading'?'<div class="spinner-small"></div>':formatRank(p.first_rank);
 tr.innerHTML=`<td>${{p.mall||'-'}}</td><td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{p.title||''}}">${{p.title||'-'}}</td>
-<td>${{p.mid}}</td><td>${{p.keyword}}</td><td>${{formatRank(p.first_rank)}}</td><td>${{formatRank(p.prev_rank)}}</td><td>${{todayHtml}}</td>
+<td>${{p.mid}}</td><td>${{p.keyword}}</td><td id="first-${{p.id}}">${{firstHtml}}</td><td>${{formatRank(p.prev_rank)}}</td><td id="rank-${{p.id}}">${{todayHtml}}</td>
 <td><button class="btn btn-info" style="padding:4px 8px;font-size:11px" onclick="showHistory(${{p.id}},'${{p.keyword}}')">이력</button>
 <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteProduct(${{p.id}})">삭제</button></td>`;
-tbody.appendChild(tr);}});}}else{{products=[];document.getElementById('tableContainer').style.display='none';document.getElementById('empty').style.display='block';
-document.getElementById('productCount').textContent='(0개)';}}}}catch(e){{document.getElementById('loading').innerHTML='<p style="color:#c00">데이터 로드 실패</p>';}}}}
-function formatRank(r){{if(!r||r==='-')return'-';if(r==='300위 밖')return'<span style="color:#888">300위 밖</span>';return r+'위';}}
+tbody.appendChild(tr);}});}}
+
+async function checkPendingRanks(){{for(const p of products){{if(p.current_rank==='-'||p.current_rank==='loading'){{await checkSingleRank(p.id);await new Promise(r=>setTimeout(r,300));}}}}}}
+
+async function checkSingleRank(pid){{try{{const r=await fetch('/api/check-rank/'+pid,{{method:'POST'}});const d=await r.json();
+if(d.success){{const p=products.find(x=>x.id===pid);if(p){{p.current_rank=d.rank;p.first_rank=d.first_rank;p.title=d.title||p.title;p.mall=d.mall||p.mall;}}
+const rankCell=document.getElementById('rank-'+pid);const firstCell=document.getElementById('first-'+pid);
+if(rankCell)rankCell.innerHTML=formatRank(d.rank);if(firstCell)firstCell.innerHTML=formatRank(d.first_rank);
+const row=document.getElementById('row-'+pid);if(row){{row.cells[0].textContent=d.mall||'-';row.cells[1].textContent=d.title||'-';row.cells[1].title=d.title||'';}}}}}}catch(e){{console.error(e);}}}}
+
+function formatRank(r){{if(!r||r==='-'||r==='loading')return'-';if(r==='300위 밖')return'<span style="color:#888">300위 밖</span>';return r+'위';}}
+
 async function addProduct(){{const mid=document.getElementById('mid').value.trim(),kw=document.getElementById('keyword').value.trim(),btn=document.getElementById('addBtn');
-if(!mid||!kw){{alert('MID와 키워드를 입력해주세요.');return;}}btn.disabled=true;btn.textContent='조회 중...';
-try{{const r=await fetch('/api/products',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mid,keyword:kw}})}});const d=await r.json();
-if(d.success){{document.getElementById('mid').value='';document.getElementById('keyword').value='';loadProducts();}}else alert(d.message);}}
+if(!mid||!kw){{alert('MID와 키워드를 입력해주세요.');return;}}btn.disabled=true;btn.textContent='등록 중...';
+try{{const r=await fetch('/api/products/quick',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{mid,keyword:kw}})}});const d=await r.json();
+if(d.success){{document.getElementById('mid').value='';document.getElementById('keyword').value='';await loadProducts();}}else alert(d.message);}}
 catch(e){{alert('서버 연결 실패');}}finally{{btn.disabled=false;btn.textContent='등록하기';}}}}
+
+async function bulkUpload(){{const fileInput=document.getElementById('excelFile');const btn=document.getElementById('bulkBtn');
+if(!fileInput.files[0]){{alert('엑셀 파일을 선택해주세요.');return;}}
+const formData=new FormData();formData.append('file',fileInput.files[0]);btn.disabled=true;btn.textContent='업로드 중...';
+try{{const r=await fetch('/api/bulk-upload',{{method:'POST',body:formData}});const d=await r.json();
+if(d.success){{alert(`${{d.count}}개 상품이 등록되었습니다.\\n순위 조회가 시작됩니다.`);fileInput.value='';await loadProducts();}}else alert(d.message);}}
+catch(e){{alert('업로드 실패');}}finally{{btn.disabled=false;btn.textContent='📁 대량등록';}}}}
+
+function downloadSample(){{window.location.href='/api/sample-excel';}}
+
 async function deleteProduct(id){{if(!confirm('정말 삭제하시겠습니까?'))return;try{{const r=await fetch('/api/products/'+id,{{method:'DELETE'}});const d=await r.json();if(d.success)loadProducts();else alert(d.message);}}catch(e){{alert('서버 연결 실패');}}}}
 async function refreshAll(){{if(!confirm('전체 순위를 새로고침하시겠습니까?\\n(시간이 걸릴 수 있습니다)'))return;const btn=document.getElementById('refreshBtn');btn.disabled=true;btn.textContent='조회 중...';
 try{{const r=await fetch('/api/refresh',{{method:'POST'}});const d=await r.json();if(d.success){{alert(`순위 조회 완료! (${{d.updated}}개 상품)`);loadProducts();}}else alert(d.message);}}
@@ -380,6 +414,109 @@ def add_product():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/products/quick', methods=['POST'])
+@login_required
+def add_product_quick():
+    d = request.json
+    mid, kw = d.get('mid'), d.get('keyword')
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT id FROM products WHERE user_id=%s AND mid=%s AND keyword=%s', (session['user_id'], mid, kw))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': '이미 등록된 상품입니다.'})
+        cur.execute('INSERT INTO products (user_id,mid,keyword,title,mall,first_rank,prev_rank,current_rank) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+                    (session['user_id'], mid, kw, '', '', '-', '-', '-'))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/bulk-upload', methods=['POST'])
+@login_required
+def bulk_upload():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '파일이 없습니다.'})
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'message': '파일이 선택되지 않았습니다.'})
+    
+    try:
+        import pandas as pd
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file)
+        
+        conn = get_db()
+        cur = conn.cursor()
+        count = 0
+        
+        for _, row in df.iterrows():
+            mid = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
+            kw = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ''
+            if mid and kw and mid != 'MID' and mid != 'mid':
+                cur.execute('SELECT id FROM products WHERE user_id=%s AND mid=%s AND keyword=%s', (session['user_id'], mid, kw))
+                if not cur.fetchone():
+                    cur.execute('INSERT INTO products (user_id,mid,keyword,title,mall,first_rank,prev_rank,current_rank) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+                                (session['user_id'], mid, kw, '', '', '-', '-', '-'))
+                    count += 1
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/check-rank/<int:pid>', methods=['POST'])
+@login_required
+def check_single_rank(pid):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT mid,keyword,first_rank FROM products WHERE id=%s AND user_id=%s', (pid, session['user_id']))
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': '상품을 찾을 수 없습니다.'})
+        
+        mid, kw, first_rank = row
+        rank, title, mall = get_naver_rank(kw, mid)
+        rank_str = str(rank) if rank else '300위 밖'
+        
+        # 최초순위가 없으면 설정
+        if first_rank == '-':
+            first_rank = rank_str
+        
+        cur.execute('UPDATE products SET title=%s,mall=%s,first_rank=%s,current_rank=%s,last_checked=NOW() WHERE id=%s',
+                    (title or '', mall or '', first_rank, rank_str, pid))
+        cur.execute('INSERT INTO rank_history (product_id,rank) VALUES (%s,%s)', (pid, rank_str))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({'success': True, 'rank': rank_str, 'first_rank': first_rank, 'title': title or '', 'mall': mall or ''})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/sample-excel')
+@login_required
+def sample_excel():
+    output = io.StringIO()
+    w = csv.writer(output)
+    w.writerow(['MID', '키워드'])
+    w.writerow(['11111111111', '검색키워드1'])
+    w.writerow(['22222222222', '검색키워드2'])
+    w.writerow(['33333333333', '검색키워드3'])
+    output.seek(0)
+    return Response('\ufeff' + output.getvalue(), mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename=sample_bulk.csv'})
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @login_required
