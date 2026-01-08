@@ -37,6 +37,118 @@ def init_db():
 def index():
     return jsonify({'status': 'API 정상 작동 중'})
 
+@app.route('/admin', methods=['GET'])
+def admin_page():
+    return '''<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원 관리</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background: #4a90d9; color: white; }
+        tr:hover { background: #f9f9f9; }
+        .btn { padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .btn-approve { background: #28a745; color: white; }
+        .btn-reject { background: #ffc107; color: black; }
+        .btn-delete { background: #dc3545; color: white; }
+        .status-y { color: #28a745; font-weight: bold; }
+        .status-n { color: #dc3545; font-weight: bold; }
+        .refresh-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #4a90d9; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        @media (max-width: 600px) {
+            th, td { padding: 8px; font-size: 12px; }
+            .btn { padding: 4px 8px; font-size: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 회원 관리</h1>
+        <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>아이디</th>
+                    <th>이름</th>
+                    <th>전화번호</th>
+                    <th>가입일</th>
+                    <th>승인</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="userTable"></tbody>
+        </table>
+    </div>
+    <script>
+        const API_URL = window.location.origin;
+        async function loadUsers() {
+            try {
+                const res = await fetch(API_URL + '/admin/users');
+                const data = await res.json();
+                if (data.success) {
+                    const tbody = document.getElementById('userTable');
+                    tbody.innerHTML = '';
+                    data.users.forEach(user => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${user.userId}</td>
+                            <td>${user.name}</td>
+                            <td>${user.phone}</td>
+                            <td>${user.regDate}</td>
+                            <td class="${user.approved === 'Y' ? 'status-y' : 'status-n'}">
+                                ${user.approved === 'Y' ? '승인됨' : '대기중'}
+                            </td>
+                            <td>
+                                ${user.approved === 'Y' 
+                                    ? `<button class="btn btn-reject" onclick="setApproval('${user.userId}', 'N')">승인취소</button>`
+                                    : `<button class="btn btn-approve" onclick="setApproval('${user.userId}', 'Y')">승인</button>`
+                                }
+                                <button class="btn btn-delete" onclick="deleteUser('${user.userId}')">삭제</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (e) {
+                alert('서버 연결 실패: ' + e.message);
+            }
+        }
+        async function setApproval(userId, approved) {
+            try {
+                const res = await fetch(API_URL + '/admin/approve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, approved })
+                });
+                const data = await res.json();
+                if (data.success) loadUsers();
+                else alert(data.message);
+            } catch (e) { alert('오류: ' + e.message); }
+        }
+        async function deleteUser(userId) {
+            if (!confirm(userId + ' 회원을 삭제하시겠습니까?')) return;
+            try {
+                const res = await fetch(API_URL + '/admin/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+                const data = await res.json();
+                if (data.success) loadUsers();
+                else alert(data.message);
+            } catch (e) { alert('오류: ' + e.message); }
+        }
+        loadUsers();
+    </script>
+</body>
+</html>'''
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
