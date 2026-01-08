@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원 관리</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: #f5f5f5; padding: 20px; }
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background: #03C75A; color: white; }
+        tr:hover { background: #f9f9f9; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-approve { background: #03C75A; color: white; }
+        .btn-reject { background: #E74C3C; color: white; }
+        .status-y { color: #03C75A; font-weight: bold; }
+        .status-n { color: #E74C3C; font-weight: bold; }
+        #loading { text-align: center; padding: 50px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛒 순위관리 프로그램 - 회원 관리</h1>
+        <div id="loading">로딩 중...</div>
+        <table id="userTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>아이디</th>
+                    <th>이름</th>
+                    <th>연락처</th>
+                    <th>가입일</th>
+                    <th>승인상태</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="userList"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // ⚠️ 여기에 Railway 배포 URL 입력
+        const API_URL = 'https://여기에-railway-url.railway.app';
+
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_URL}/admin/users`);
+                const data = await res.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('userTable').style.display = 'table';
+                
+                const tbody = document.getElementById('userList');
+                tbody.innerHTML = '';
+                
+                data.users.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${user.userId}</td>
+                        <td>${user.name}</td>
+                        <td>${user.phone}</td>
+                        <td>${user.regDate}</td>
+                        <td class="${user.approved === 'Y' ? 'status-y' : 'status-n'}">
+                            ${user.approved === 'Y' ? '승인됨' : '대기중'}
+                        </td>
+                        <td>
+                            ${user.approved === 'N' 
+                                ? `<button class="btn btn-approve" onclick="approve('${user.userId}', 'Y')">승인</button>`
+                                : `<button class="btn btn-reject" onclick="approve('${user.userId}', 'N')">차단</button>`
+                            }
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                document.getElementById('loading').textContent = '오류 발생: ' + e.message;
+            }
+        }
+
+        async function approve(userId, status) {
+            try {
+                await fetch(`${API_URL}/admin/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, approved: status })
+                });
+                loadUsers();
+            } catch (e) {
+                alert('오류 발생: ' + e.message);
+            }
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
