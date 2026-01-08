@@ -176,7 +176,6 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 <li><a href="/dashboard" class="active"><span class="icon">🛍️</span>네이버 쇼핑 순위체크</a></li>
 <li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">🚀</span>쿠팡 순위체크<span class="soon">준비중</span></a></li>
 <li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">📍</span>네이버 플레이스<span class="soon">준비중</span></a></li>
-<li style="margin-top:30px"><a href="/admin"><span class="icon">⚙️</span>회원 관리</a></li>
 </ul><div class="sidebar-footer"><a href="/api/logout">🚪 로그아웃</a></div></nav>
 <main class="main">
 <header class="header"><h2>🛍️ 네이버 쇼핑 순위체크</h2><div style="font-size:14px;color:#666">👤 {name}님</div></header>
