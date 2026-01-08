@@ -7,91 +7,118 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Malgun Gothic', sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; margin-bottom: 20px; color: #333; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #ddd; }
-        th { background: #03C75A; color: white; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background: #4a90d9; color: white; }
         tr:hover { background: #f9f9f9; }
-        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-approve { background: #03C75A; color: white; }
-        .btn-reject { background: #E74C3C; color: white; }
-        .status-y { color: #03C75A; font-weight: bold; }
-        .status-n { color: #E74C3C; font-weight: bold; }
-        #loading { text-align: center; padding: 50px; }
+        .btn { padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .btn-approve { background: #28a745; color: white; }
+        .btn-reject { background: #ffc107; color: black; }
+        .btn-delete { background: #dc3545; color: white; }
+        .status-y { color: #28a745; font-weight: bold; }
+        .status-n { color: #dc3545; font-weight: bold; }
+        .refresh-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #4a90d9; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🛒 순위관리 프로그램 - 회원 관리</h1>
-        <div id="loading">로딩 중...</div>
-        <table id="userTable" style="display: none;">
+        <h1>🔐 회원 관리</h1>
+        <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
+        <table>
             <thead>
                 <tr>
                     <th>아이디</th>
                     <th>이름</th>
-                    <th>연락처</th>
+                    <th>전화번호</th>
                     <th>가입일</th>
-                    <th>승인상태</th>
+                    <th>승인</th>
                     <th>관리</th>
                 </tr>
             </thead>
-            <tbody id="userList"></tbody>
+            <tbody id="userTable"></tbody>
         </table>
     </div>
 
     <script>
-        // ⚠️ 여기에 Railway 배포 URL 입력
-        const API_URL = 'https://여기에-railway-url.railway.app';
+        // ⚠️ Railway 배포 후 이 URL을 수정하세요!
+        const API_URL = 'https://your-app.railway.app';
 
         async function loadUsers() {
             try {
-                const res = await fetch(`${API_URL}/admin/users`);
+                const res = await fetch(API_URL + '/admin/users');
                 const data = await res.json();
                 
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('userTable').style.display = 'table';
-                
-                const tbody = document.getElementById('userList');
-                tbody.innerHTML = '';
-                
-                data.users.forEach(user => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${user.userId}</td>
-                        <td>${user.name}</td>
-                        <td>${user.phone}</td>
-                        <td>${user.regDate}</td>
-                        <td class="${user.approved === 'Y' ? 'status-y' : 'status-n'}">
-                            ${user.approved === 'Y' ? '승인됨' : '대기중'}
-                        </td>
-                        <td>
-                            ${user.approved === 'N' 
-                                ? `<button class="btn btn-approve" onclick="approve('${user.userId}', 'Y')">승인</button>`
-                                : `<button class="btn btn-reject" onclick="approve('${user.userId}', 'N')">차단</button>`
-                            }
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                if (data.success) {
+                    const tbody = document.getElementById('userTable');
+                    tbody.innerHTML = '';
+                    
+                    data.users.forEach(user => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${user.userId}</td>
+                            <td>${user.name}</td>
+                            <td>${user.phone}</td>
+                            <td>${user.regDate}</td>
+                            <td class="${user.approved === 'Y' ? 'status-y' : 'status-n'}">
+                                ${user.approved === 'Y' ? '승인됨' : '대기중'}
+                            </td>
+                            <td>
+                                ${user.approved === 'Y' 
+                                    ? `<button class="btn btn-reject" onclick="setApproval('${user.userId}', 'N')">승인취소</button>`
+                                    : `<button class="btn btn-approve" onclick="setApproval('${user.userId}', 'Y')">승인</button>`
+                                }
+                                <button class="btn btn-delete" onclick="deleteUser('${user.userId}')">삭제</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
             } catch (e) {
-                document.getElementById('loading').textContent = '오류 발생: ' + e.message;
+                alert('서버 연결 실패: ' + e.message);
             }
         }
 
-        async function approve(userId, status) {
+        async function setApproval(userId, approved) {
             try {
-                await fetch(`${API_URL}/admin/approve`, {
+                const res = await fetch(API_URL + '/admin/approve', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, approved: status })
+                    body: JSON.stringify({ userId, approved })
                 });
-                loadUsers();
+                const data = await res.json();
+                if (data.success) {
+                    loadUsers();
+                } else {
+                    alert(data.message);
+                }
             } catch (e) {
-                alert('오류 발생: ' + e.message);
+                alert('오류: ' + e.message);
             }
         }
 
+        async function deleteUser(userId) {
+            if (!confirm(userId + ' 회원을 삭제하시겠습니까?')) return;
+            
+            try {
+                const res = await fetch(API_URL + '/admin/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadUsers();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert('오류: ' + e.message);
+            }
+        }
+
+        // 페이지 로드 시 회원 목록 불러오기
         loadUsers();
     </script>
 </body>
