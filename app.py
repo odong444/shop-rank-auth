@@ -6,7 +6,7 @@ import urllib.request
 import urllib.parse
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from functools import wraps
 import csv
@@ -22,6 +22,7 @@ NAVER_CLIENT_SECRET = "x3z9b1CM2F"
 KST = pytz.timezone('Asia/Seoul')
 
 ADMIN_PASSWORD = "02100210"
+CACHE_DURATION_MINUTES = 60  # 캐시 유지 시간 (1시간)
 
 def get_db():
     return psycopg.connect(DATABASE_URL)
@@ -44,9 +45,16 @@ def init_db():
     cur.execute('''CREATE TABLE IF NOT EXISTS rank_history (
         id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
         rank VARCHAR(20) NOT NULL, checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # 키워드 캐시 테이블
+    cur.execute('''CREATE TABLE IF NOT EXISTS keyword_cache (
+        id SERIAL PRIMARY KEY,
+        keyword VARCHAR(100) UNIQUE NOT NULL,
+        search_results TEXT,
+        cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     
-    # 기존 테이블에 새 컬럼 추가 (각각 별도 트랜잭션)
+    # 기존 테이블에 새 컬럼 추가
     for col in [("first_rank", "VARCHAR(20) DEFAULT '-'"), ("prev_rank", "VARCHAR(20) DEFAULT '-'"), ("last_checked", "TIMESTAMP")]:
         try:
             cur.execute(f"ALTER TABLE products ADD COLUMN {col[0]} {col[1]}")
@@ -65,7 +73,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def get_naver_rank(keyword, target_mid):
+def get_naver_search_results(keyword):
+    """네이버 API로 300위까지 검색 결과 가져오기"""
+    results = []
     try:
         enc = urllib.parse.quote(keyword)
         for start in range(1, 301, 100):
@@ -75,17 +85,114 @@ def get_naver_rank(keyword, target_mid):
             req.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
             res = urllib.request.urlopen(req, timeout=10)
             data = json.loads(res.read().decode('utf-8'))
-            if not data['items']: break
+            if not data['items']:
+                break
             for idx, item in enumerate(data['items']):
-                if str(item['productId']) == str(target_mid):
-                    rank = (start - 1) + (idx + 1)
-                    title = item['title'].replace('<b>', '').replace('</b>', '')
-                    return rank, title, item['mallName']
+                rank = (start - 1) + (idx + 1)
+                results.append({
+                    'rank': rank,
+                    'mid': str(item['productId']),
+                    'title': item['title'].replace('<b>', '').replace('</b>', ''),
+                    'mall': item['mallName']
+                })
             time.sleep(0.1)
-        return None, None, None
     except Exception as e:
         print(f"API Error: {e}")
-        return None, None, None
+    return results
+
+def get_cached_results(keyword):
+    """캐시된 검색 결과 가져오기 (1시간 이내)"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('SELECT search_results, cached_at FROM keyword_cache WHERE keyword=%s', (keyword,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if row:
+        cached_at = row[1]
+        if cached_at.tzinfo is None:
+            cached_at = pytz.utc.localize(cached_at)
+        now = datetime.now(pytz.utc)
+        if now - cached_at < timedelta(minutes=CACHE_DURATION_MINUTES):
+            return json.loads(row[0]) if row[0] else None
+    return None
+
+def save_cache(keyword, results):
+    """검색 결과 캐시 저장"""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute('''INSERT INTO keyword_cache (keyword, search_results, cached_at) 
+                      VALUES (%s, %s, NOW()) 
+                      ON CONFLICT (keyword) DO UPDATE SET search_results=%s, cached_at=NOW()''',
+                   (keyword, json.dumps(results), json.dumps(results)))
+        conn.commit()
+    except Exception as e:
+        print(f"Cache save error: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+def update_all_products_with_keyword(keyword, results):
+    """해당 키워드를 가진 모든 사용자의 상품 순위 업데이트"""
+    if not results:
+        return 0
+    
+    # mid -> result 매핑
+    mid_map = {r['mid']: r for r in results}
+    
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # 해당 키워드를 가진 모든 상품 조회
+    cur.execute('SELECT id, mid, first_rank FROM products WHERE keyword=%s', (keyword,))
+    products = cur.fetchall()
+    
+    updated = 0
+    for pid, mid, first_rank in products:
+        if mid in mid_map:
+            r = mid_map[mid]
+            rank_str = str(r['rank'])
+            new_first = first_rank if first_rank != '-' else rank_str
+            cur.execute('''UPDATE products SET prev_rank=current_rank, current_rank=%s, 
+                          title=COALESCE(NULLIF(%s,''),title), mall=COALESCE(NULLIF(%s,''),mall),
+                          first_rank=%s, last_checked=NOW() WHERE id=%s''',
+                       (rank_str, r['title'], r['mall'], new_first, pid))
+            cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, rank_str))
+            updated += 1
+        else:
+            # 300위 밖
+            cur.execute('''UPDATE products SET prev_rank=current_rank, current_rank=%s, last_checked=NOW() WHERE id=%s''',
+                       ('300위 밖', pid))
+            cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, '300위 밖'))
+            updated += 1
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return updated
+
+def get_naver_rank(keyword, target_mid):
+    """단일 상품 순위 조회 (캐시 활용)"""
+    # 캐시 확인
+    results = get_cached_results(keyword)
+    
+    if not results:
+        # 캐시 없으면 API 호출
+        results = get_naver_search_results(keyword)
+        if results:
+            save_cache(keyword, results)
+            # 같은 키워드의 다른 상품들도 업데이트
+            update_all_products_with_keyword(keyword, results)
+    
+    # 결과에서 해당 MID 찾기
+    for r in results:
+        if r['mid'] == str(target_mid):
+            return r['rank'], r['title'], r['mall']
+    
+    return None, None, None
 
 # ===== HTML PAGES =====
 
@@ -158,7 +265,7 @@ def dashboard_page():
 .form-row button{{padding:10px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer}}
 .form-row button:disabled{{background:#ccc;cursor:not-allowed}}.btn-group{{display:flex;gap:10px;flex-wrap:wrap}}
 .btn{{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}}.btn-primary{{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}}
-.btn-success{{background:#28a745;color:#fff}}.btn-info{{background:#17a2b8;color:#fff}}.btn-danger{{background:#dc3545;color:#fff}}
+.btn-success{{background:#28a745;color:#fff}}.btn-info{{background:#17a2b8;color:#fff}}.btn-danger{{background:#dc3545;color:#fff}}.btn-warning{{background:#ffc107;color:#000}}
 .table-container{{overflow-x:auto}}table{{width:100%;border-collapse:collapse;font-size:13px}}th,td{{padding:12px 10px;text-align:center;border-bottom:1px solid #eee}}
 th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{color:#dc3545;font-weight:bold}}.rank-down{{color:#28a745;font-weight:bold}}
 .empty{{text-align:center;padding:60px 20px;color:#888}}.empty-icon{{font-size:50px;margin-bottom:15px}}.loading{{text-align:center;padding:40px;color:#666}}
@@ -169,6 +276,9 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .modal-content{{background:#fff;padding:25px;border-radius:15px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto}}
 .modal-header{{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #eee}}
 .modal-close{{background:none;border:none;font-size:28px;cursor:pointer;color:#888}}
+.checkbox-col{{width:40px}}input[type="checkbox"]{{width:18px;height:18px;cursor:pointer}}
+.selected-info{{display:none;padding:10px 15px;background:#fff3cd;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between}}
+.selected-info.show{{display:flex}}
 @media(max-width:768px){{.sidebar{{display:none}}.layout{{flex-direction:column}}th,td{{padding:8px 5px;font-size:11px}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}}}</style></head>
 <body><div class="layout">
 <nav class="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
@@ -194,6 +304,12 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 </div>
 <p style="margin-top:10px;font-size:12px;color:#888">* 등록 후 순위가 자동으로 조회됩니다 (개별 로딩)</p>
 </div></div>
+
+<div class="selected-info" id="selectedInfo">
+<span><strong id="selectedCount">0</strong>개 선택됨</span>
+<button class="btn btn-danger" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+</div>
+
 <div class="card"><div class="card-header"><h3>📋 내 상품 목록 <span id="productCount" style="color:#667eea"></span></h3>
 <div class="btn-group">
 <button class="btn btn-success" onclick="exportExcel()">📥 엑셀 다운로드</button>
@@ -202,7 +318,9 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 <div class="card-body">
 <div id="loading" class="loading"><div class="spinner"></div><p>로딩 중...</p></div>
 <div class="table-container" id="tableContainer" style="display:none">
-<table><thead><tr><th>스토어명</th><th>상품명</th><th>MID</th><th>키워드</th><th>최초순위</th><th>이전순위</th><th>오늘순위</th><th>관리</th></tr></thead>
+<table><thead><tr>
+<th class="checkbox-col"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+<th>스토어명</th><th>상품명</th><th>MID</th><th>키워드</th><th>최초순위</th><th>이전순위</th><th>오늘순위</th><th>관리</th></tr></thead>
 <tbody id="productBody"></tbody></table></div>
 <div id="empty" class="empty" style="display:none"><div class="empty-icon">📦</div><p>등록된 상품이 없습니다.<br>상품을 등록해보세요!</p></div>
 </div></div></div>
@@ -214,24 +332,42 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 </main></div>
 <script>
 let products=[];
+let selectedIds=new Set();
+
 async function loadProducts(){{try{{const r=await fetch('/api/products');const d=await r.json();document.getElementById('loading').style.display='none';
 if(d.success&&d.products.length>0){{products=d.products;document.getElementById('tableContainer').style.display='block';document.getElementById('empty').style.display='none';
-document.getElementById('productCount').textContent=`(${{d.products.length}}개)`;renderTable();checkPendingRanks();}}
+document.getElementById('productCount').textContent=`(${{d.products.length}}개)`;selectedIds.clear();updateSelectedInfo();renderTable();checkPendingRanks();}}
 else{{products=[];document.getElementById('tableContainer').style.display='none';document.getElementById('empty').style.display='block';
 document.getElementById('productCount').textContent='(0개)';}}}}catch(e){{document.getElementById('loading').innerHTML='<p style="color:#c00">데이터 로드 실패</p>';}}}}
 
 function renderTable(){{const tbody=document.getElementById('productBody');tbody.innerHTML='';
 products.forEach(p=>{{const tr=document.createElement('tr');tr.id='row-'+p.id;
+const isChecked=selectedIds.has(p.id)?'checked':'';
 let todayHtml=p.current_rank==='-'||p.current_rank==='loading'?'<div class="spinner-small"></div>':formatRank(p.current_rank);
 if(p.prev_rank&&p.prev_rank!=='-'&&p.current_rank&&p.current_rank!=='-'&&p.current_rank!=='300위 밖'&&p.current_rank!=='loading'){{
 const prev=parseInt(p.prev_rank),curr=parseInt(p.current_rank);if(!isNaN(prev)&&!isNaN(curr)){{const diff=prev-curr;
 if(diff>0)todayHtml+=` <span class="rank-down">▲${{diff}}</span>`;else if(diff<0)todayHtml+=` <span class="rank-up">▼${{Math.abs(diff)}}</span>`;}}}}
 let firstHtml=p.first_rank==='-'||p.first_rank==='loading'?'<div class="spinner-small"></div>':formatRank(p.first_rank);
-tr.innerHTML=`<td>${{p.mall||'-'}}</td><td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{p.title||''}}">${{p.title||'-'}}</td>
+tr.innerHTML=`<td class="checkbox-col"><input type="checkbox" ${{isChecked}} onchange="toggleSelect(${{p.id}})"></td>
+<td>${{p.mall||'-'}}</td><td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{p.title||''}}">${{p.title||'-'}}</td>
 <td>${{p.mid}}</td><td>${{p.keyword}}</td><td id="first-${{p.id}}">${{firstHtml}}</td><td>${{formatRank(p.prev_rank)}}</td><td id="rank-${{p.id}}">${{todayHtml}}</td>
 <td><button class="btn btn-info" style="padding:4px 8px;font-size:11px" onclick="showHistory(${{p.id}},'${{p.keyword}}')">이력</button>
 <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteProduct(${{p.id}})">삭제</button></td>`;
-tbody.appendChild(tr);}});}}
+tbody.appendChild(tr);}});
+document.getElementById('selectAll').checked=selectedIds.size===products.length&&products.length>0;}}
+
+function toggleSelect(id){{if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);updateSelectedInfo();
+document.getElementById('selectAll').checked=selectedIds.size===products.length&&products.length>0;}}
+
+function toggleSelectAll(){{const checked=document.getElementById('selectAll').checked;
+if(checked)products.forEach(p=>selectedIds.add(p.id));else selectedIds.clear();updateSelectedInfo();renderTable();}}
+
+function updateSelectedInfo(){{const info=document.getElementById('selectedInfo');const count=document.getElementById('selectedCount');
+count.textContent=selectedIds.size;if(selectedIds.size>0)info.classList.add('show');else info.classList.remove('show');}}
+
+async function deleteSelected(){{if(selectedIds.size===0)return;if(!confirm(`${{selectedIds.size}}개 상품을 삭제하시겠습니까?`))return;
+try{{const r=await fetch('/api/products/bulk-delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{ids:Array.from(selectedIds)}})}});
+const d=await r.json();if(d.success){{alert(`${{d.deleted}}개 삭제 완료`);selectedIds.clear();loadProducts();}}else alert(d.message);}}catch(e){{alert('서버 연결 실패');}}}}
 
 async function checkPendingRanks(){{for(const p of products){{if(p.current_rank==='-'||p.current_rank==='loading'){{await checkSingleRank(p.id);await new Promise(r=>setTimeout(r,300));}}}}}}
 
@@ -239,7 +375,7 @@ async function checkSingleRank(pid){{try{{const r=await fetch('/api/check-rank/'
 if(d.success){{const p=products.find(x=>x.id===pid);if(p){{p.current_rank=d.rank;p.first_rank=d.first_rank;p.title=d.title||p.title;p.mall=d.mall||p.mall;}}
 const rankCell=document.getElementById('rank-'+pid);const firstCell=document.getElementById('first-'+pid);
 if(rankCell)rankCell.innerHTML=formatRank(d.rank);if(firstCell)firstCell.innerHTML=formatRank(d.first_rank);
-const row=document.getElementById('row-'+pid);if(row){{row.cells[0].textContent=d.mall||'-';row.cells[1].textContent=d.title||'-';row.cells[1].title=d.title||'';}}}}}}catch(e){{console.error(e);}}}}
+const row=document.getElementById('row-'+pid);if(row){{row.cells[1].textContent=d.mall||'-';row.cells[2].textContent=d.title||'-';row.cells[2].title=d.title||'';}}}}}}catch(e){{console.error(e);}}}}
 
 function formatRank(r){{if(!r||r==='-'||r==='loading')return'-';if(r==='300위 밖')return'<span style="color:#888">300위 밖</span>';return r+'위';}}
 
@@ -259,13 +395,16 @@ catch(e){{alert('업로드 실패');}}finally{{btn.disabled=false;btn.textConten
 function downloadSample(){{window.location.href='/api/sample-excel';}}
 
 async function deleteProduct(id){{if(!confirm('정말 삭제하시겠습니까?'))return;try{{const r=await fetch('/api/products/'+id,{{method:'DELETE'}});const d=await r.json();if(d.success)loadProducts();else alert(d.message);}}catch(e){{alert('서버 연결 실패');}}}}
+
 async function refreshAll(){{if(!confirm('전체 순위를 새로고침하시겠습니까?\\n(시간이 걸릴 수 있습니다)'))return;const btn=document.getElementById('refreshBtn');btn.disabled=true;btn.textContent='조회 중...';
 try{{const r=await fetch('/api/refresh',{{method:'POST'}});const d=await r.json();if(d.success){{alert(`순위 조회 완료! (${{d.updated}}개 상품)`);loadProducts();}}else alert(d.message);}}
 catch(e){{alert('서버 연결 실패');}}finally{{btn.disabled=false;btn.textContent='🔄 전체 새로고침';}}}}
+
 async function showHistory(pid,kw){{try{{const r=await fetch('/api/history/'+pid);const d=await r.json();document.getElementById('historyTitle').textContent='키워드: '+kw;
 const tbody=document.getElementById('historyBody');tbody.innerHTML='';if(d.success&&d.history.length>0){{d.history.forEach(h=>{{const tr=document.createElement('tr');
 tr.innerHTML=`<td>${{h.checked_at}}</td><td>${{formatRank(h.rank)}}</td>`;tbody.appendChild(tr);}});}}else tbody.innerHTML='<tr><td colspan="2">이력이 없습니다.</td></tr>';
 document.getElementById('historyModal').style.display='flex';}}catch(e){{alert('이력 조회 실패');}}}}
+
 function closeModal(){{document.getElementById('historyModal').style.display='none';}}
 function exportExcel(){{if(products.length===0){{alert('다운로드할 데이터가 없습니다.');return;}}window.location.href='/api/export';}}
 document.getElementById('historyModal').addEventListener('click',function(e){{if(e.target===this)closeModal();}});
@@ -436,6 +575,27 @@ def add_product_quick():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/api/products/bulk-delete', methods=['POST'])
+@login_required
+def bulk_delete_products():
+    d = request.json
+    ids = d.get('ids', [])
+    if not ids:
+        return jsonify({'success': False, 'message': '삭제할 항목이 없습니다.'})
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        deleted = 0
+        for pid in ids:
+            cur.execute('DELETE FROM products WHERE id=%s AND user_id=%s', (pid, session['user_id']))
+            deleted += cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'deleted': deleted})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/api/bulk-upload', methods=['POST'])
 @login_required
 def bulk_upload():
@@ -563,19 +723,30 @@ def refresh_ranks():
         cur = conn.cursor()
         cur.execute('SELECT id,mid,keyword FROM products WHERE user_id=%s', (session['user_id'],))
         rows = cur.fetchall()
-        updated = 0
-        for r in rows:
-            pid, mid, kw = r
-            rank, title, mall = get_naver_rank(kw, mid)
-            rank_str = str(rank) if rank else '300위 밖'
-            cur.execute('UPDATE products SET prev_rank=current_rank,current_rank=%s,title=COALESCE(NULLIF(%s,\'\'),title),mall=COALESCE(NULLIF(%s,\'\'),mall),last_checked=NOW() WHERE id=%s',
-                        (rank_str, title or '', mall or '', pid))
-            cur.execute('INSERT INTO rank_history (product_id,rank) VALUES (%s,%s)', (pid, rank_str))
-            updated += 1
-            time.sleep(0.2)
-        conn.commit()
         cur.close()
         conn.close()
+        
+        # 키워드별로 그룹화
+        keyword_products = {}
+        for r in rows:
+            pid, mid, kw = r
+            if kw not in keyword_products:
+                keyword_products[kw] = []
+            keyword_products[kw].append({'id': pid, 'mid': mid})
+        
+        updated = 0
+        for kw, prods in keyword_products.items():
+            # 캐시 확인
+            results = get_cached_results(kw)
+            if not results:
+                results = get_naver_search_results(kw)
+                if results:
+                    save_cache(kw, results)
+                time.sleep(0.2)
+            
+            # 해당 키워드의 모든 상품 업데이트 (다른 사용자 포함)
+            updated += update_all_products_with_keyword(kw, results)
+        
         return jsonify({'success': True, 'updated': updated})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
