@@ -251,12 +251,13 @@ def dashboard_page():
     name = session.get('name', '')
     return f'''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>대시보드</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Malgun Gothic',sans-serif;background:#f5f7fa;min-height:100vh}}
-.layout{{display:flex;min-height:100vh}}.sidebar{{width:250px;background:linear-gradient(180deg,#2c3e50,#1a252f);color:#fff;padding:20px 0;flex-shrink:0}}
+.layout{{display:flex;min-height:100vh}}.sidebar{{width:250px;background:linear-gradient(180deg,#2c3e50,#1a252f);color:#fff;padding:20px 0;flex-shrink:0;display:flex;flex-direction:column}}
 .sidebar-header{{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:20px}}.sidebar-header h1{{font-size:18px}}.sidebar-header p{{font-size:12px;color:#888}}
 .sidebar-menu{{list-style:none}}.sidebar-menu li{{margin:5px 10px}}.sidebar-menu a{{display:flex;align-items:center;padding:12px 15px;color:#ccc;text-decoration:none;border-radius:8px;font-size:14px}}
 .sidebar-menu a:hover{{background:rgba(255,255,255,.1);color:#fff}}.sidebar-menu a.active{{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}}
 .sidebar-menu .icon{{margin-right:10px;font-size:18px}}.sidebar-menu .soon{{margin-left:auto;font-size:11px;color:#666}}
-.sidebar-footer{{position:fixed;bottom:20px;left:0;width:250px;padding:20px;border-top:1px solid rgba(255,255,255,.1)}}.sidebar-footer a{{color:#888;text-decoration:none;font-size:13px}}
+.sidebar-footer{{padding:20px;border-top:1px solid rgba(255,255,255,.1)}}.sidebar-footer a{{color:#888;text-decoration:none;font-size:13px}}
+.sidebar-contact{{padding:10px;margin-top:auto;border-top:1px solid rgba(255,255,255,.1)}}.contact-btn{{display:flex;align-items:center;padding:8px 15px;margin:5px 10px;background:rgba(255,255,255,.05);border-radius:8px;color:#ccc;text-decoration:none;font-size:12px;transition:all .2s}}.contact-btn:hover{{background:#fee500;color:#000}}.contact-btn img{{width:20px;height:20px;margin-right:8px;border-radius:4px}}
 .main{{flex:1;display:flex;flex-direction:column}}.header{{background:#fff;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}}
 .header h2{{font-size:18px}}.content{{flex:1;padding:25px;overflow-y:auto}}
 .card{{background:#fff;border-radius:12px;box-shadow:0 2px 15px rgba(0,0,0,.05);margin-bottom:20px}}.card-header{{padding:20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}}
@@ -286,7 +287,15 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 <li><a href="/dashboard" class="active"><span class="icon">🛍️</span>네이버 쇼핑 순위체크</a></li>
 <li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">🚀</span>쿠팡 순위체크<span class="soon">준비중</span></a></li>
 <li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">📍</span>네이버 플레이스<span class="soon">준비중</span></a></li>
-</ul><div class="sidebar-footer"><a href="/api/logout">🚪 로그아웃</a></div></nav>
+</ul>
+<div class="sidebar-contact">
+<p style="color:#888;font-size:12px;margin-bottom:10px;padding:0 15px">📞 문의하기</p>
+<a href="http://pf.kakao.com/_HcdEn" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">리뷰작업 문의</a>
+<a href="http://pf.kakao.com/_xkKUnxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">네이버 트래픽 문의</a>
+<a href="http://pf.kakao.com/_xayNxjG" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">쿠팡 트래픽 문의</a>
+<a href="http://pf.kakao.com/_NxfIxfxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">체험단 문의</a>
+</div>
+<div class="sidebar-footer"><a href="/api/logout">🚪 로그아웃</a></div></nav>
 <main class="main">
 <header class="header"><h2>🛍️ 네이버 쇼핑 순위체크</h2><div style="font-size:14px;color:#666">👤 {name}님</div></header>
 <div class="content">
