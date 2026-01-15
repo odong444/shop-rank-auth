@@ -264,14 +264,8 @@ def register_page():
 .container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:90%;max-width:400px}h1{text-align:center;margin-bottom:30px}
 .form-group{margin-bottom:15px}.form-group label{display:block;margin-bottom:5px;font-weight:bold;font-size:14px}.form-group input{width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px}
 .btn{width:100%;padding:15px;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px}.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}.btn-secondary{background:#f0f0f0}
-.btn:disabled{background:#ccc;cursor:not-allowed}
 .error,.success{padding:10px;border-radius:10px;margin-bottom:15px;text-align:center;display:none}.error{background:#ffe0e0;color:#c00}.success{background:#e0ffe0;color:#060}
-.notice-box{background:#fff3cd;color:#856404;padding:12px;border-radius:10px;margin-bottom:20px;font-size:13px;line-height:1.6;border:1px solid #ffc107}
-.phone-row{display:flex;gap:10px}.phone-row input{flex:1}.phone-row button{white-space:nowrap;padding:12px 15px;background:#28a745;color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer}
-.phone-row button:disabled{background:#ccc}
-.verify-row{display:none;margin-top:10px}.verify-row.show{display:flex;gap:10px}.verify-row input{flex:1}.verify-row button{white-space:nowrap;padding:12px 15px;background:#17a2b8;color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer}
-.verified{color:#28a745;font-size:13px;margin-top:5px;display:none}.verified.show{display:block}
-.timer{color:#dc3545;font-size:12px;margin-top:5px}</style></head>
+.notice-box{background:#fff3cd;color:#856404;padding:12px;border-radius:10px;margin-bottom:20px;font-size:13px;line-height:1.6;border:1px solid #ffc107}</style></head>
 <body><div class="container"><h1>📝 회원가입</h1>
 <div class="notice-box">⚠️ 이름과 연락처는 정확하게 입력해주세요.<br>허위 정보 입력 시 사전 안내 없이 계정이 삭제될 수 있습니다.</div>
 <div class="error" id="error"></div><div class="success" id="success"></div>
@@ -279,66 +273,11 @@ def register_page():
 <div class="form-group"><label>비밀번호</label><input type="password" id="password"></div>
 <div class="form-group"><label>비밀번호 확인</label><input type="password" id="password2"></div>
 <div class="form-group"><label>이름</label><input type="text" id="name"></div>
-<div class="form-group"><label>연락처</label>
-<div class="phone-row"><input type="text" id="phone" placeholder="01012345678"><button type="button" onclick="sendCode()" id="sendBtn">인증요청</button></div>
-<div class="verify-row" id="verifyRow"><input type="text" id="verifyCode" placeholder="인증번호 6자리"><button type="button" onclick="verifyCode()">확인</button></div>
-<div class="timer" id="timer"></div>
-<div class="verified" id="verified">✅ 인증완료</div>
-</div>
-<button class="btn btn-primary" onclick="doRegister()" id="registerBtn" disabled>인증 후 가입 가능</button>
+<div class="form-group"><label>연락처</label><input type="text" id="phone" placeholder="01012345678"></div>
+<button class="btn btn-primary" onclick="doRegister()">가입하기</button>
 <button class="btn btn-secondary" onclick="location.href='/login'">로그인으로</button></div>
 <script>
-let isVerified=false;
-let timerInterval=null;
-
-function startTimer(sec){
-clearInterval(timerInterval);
-const timerEl=document.getElementById('timer');
-timerInterval=setInterval(()=>{
-if(sec<=0){clearInterval(timerInterval);timerEl.textContent='시간초과. 다시 요청해주세요.';return;}
-const m=Math.floor(sec/60),s=sec%60;
-timerEl.textContent=`남은시간: ${m}:${s.toString().padStart(2,'0')}`;
-sec--;
-},1000);
-}
-
-async function sendCode(){
-const phone=document.getElementById('phone').value.replace(/-/g,'');
-const btn=document.getElementById('sendBtn');
-if(!/^01[0-9]{8,9}$/.test(phone)){alert('올바른 휴대폰 번호를 입력해주세요.');return;}
-btn.disabled=true;btn.textContent='발송중...';
-try{
-const r=await fetch('/api/send-sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
-const d=await r.json();
-if(d.success){alert('인증번호가 발송되었습니다.');document.getElementById('verifyRow').classList.add('show');startTimer(180);}
-else alert(d.message||'발송 실패');
-}catch(e){alert('서버 연결 실패');}
-finally{btn.disabled=false;btn.textContent='재발송';}
-}
-
-async function verifyCode(){
-const phone=document.getElementById('phone').value.replace(/-/g,'');
-const code=document.getElementById('verifyCode').value;
-if(!code){alert('인증번호를 입력해주세요.');return;}
-try{
-const r=await fetch('/api/verify-sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
-const d=await r.json();
-if(d.success){
-isVerified=true;
-clearInterval(timerInterval);
-document.getElementById('timer').textContent='';
-document.getElementById('verifyRow').classList.remove('show');
-document.getElementById('verified').classList.add('show');
-document.getElementById('phone').readOnly=true;
-document.getElementById('sendBtn').style.display='none';
-document.getElementById('registerBtn').disabled=false;
-document.getElementById('registerBtn').textContent='가입하기';
-}else alert(d.message||'인증 실패');
-}catch(e){alert('서버 연결 실패');}
-}
-
 async function doRegister(){
-if(!isVerified){alert('휴대폰 인증을 완료해주세요.');return;}
 const u=document.getElementById('userId').value,p=document.getElementById('password').value,p2=document.getElementById('password2').value,
 n=document.getElementById('name').value,ph=document.getElementById('phone').value.replace(/-/g,''),err=document.getElementById('error'),suc=document.getElementById('success');
 err.style.display='none';suc.style.display='none';
@@ -668,14 +607,14 @@ def api_register():
             cur.close()
             conn.close()
             return jsonify({'success': False, 'message': '이미 사용 중인 아이디입니다.'})
-        # 휴대폰 인증 확인
         phone = d.get('phone', '').replace('-', '')
-        cur.execute("SELECT verified FROM sms_verify WHERE phone=%s ORDER BY created_at DESC LIMIT 1", (phone,))
-        verify_row = cur.fetchone()
-        if not verify_row or not verify_row[0]:
-            cur.close()
-            conn.close()
-            return jsonify({'success': False, 'message': '휴대폰 인증이 필요합니다.'})
+        # SMS 인증 체크 (현재 비활성화)
+        # cur.execute("SELECT verified FROM sms_verify WHERE phone=%s ORDER BY created_at DESC LIMIT 1", (phone,))
+        # verify_row = cur.fetchone()
+        # if not verify_row or not verify_row[0]:
+        #     cur.close()
+        #     conn.close()
+        #     return jsonify({'success': False, 'message': '휴대폰 인증이 필요합니다.'})
         cur.execute('INSERT INTO users (user_id,password,name,phone,approved) VALUES (%s,%s,%s,%s,%s)', (d.get('userId'), d.get('password'), d.get('name'), phone, 'Y'))
         conn.commit()
         cur.close()
