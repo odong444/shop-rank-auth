@@ -505,10 +505,10 @@ def product_score_page():
 .header h2{{font-size:18px}}.content{{flex:1;padding:25px;overflow-y:auto}}
 .card{{background:#fff;border-radius:12px;box-shadow:0 2px 15px rgba(0,0,0,.05);margin-bottom:20px}}.card-header{{padding:20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}}
 .card-header h3{{font-size:16px}}.card-body{{padding:20px}}
-.search-box{{display:flex;gap:10px;align-items:center;flex-wrap:wrap}}
-.search-box input{{flex:1;min-width:300px;padding:12px 15px;border:2px solid #e0e0e0;border-radius:8px;font-size:15px}}
+.search-box{{display:flex;gap:0;align-items:center}}
+.search-box input{{width:250px;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px 0 0 8px;font-size:14px;border-right:none}}
 .search-box input:focus{{outline:none;border-color:#667eea}}
-.search-box button{{padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px}}
+.search-box button{{padding:10px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:0 8px 8px 0;font-weight:bold;cursor:pointer;font-size:14px}}
 .search-box button:disabled{{background:#ccc;cursor:not-allowed}}
 .result-info{{margin:15px 0;font-size:14px;color:#666}}
 .score-table{{width:100%;border-collapse:collapse;font-size:12px}}
@@ -517,6 +517,7 @@ def product_score_page():
 .score-table .product-row{{background:#f0f4ff}}
 .score-table .product-row td{{text-align:left;font-size:11px;color:#555}}
 .score-table .data-row td{{font-size:12px}}
+.score-table .img-cell{{text-align:center;vertical-align:middle}}
 .score-table .product-img{{width:50px;height:50px;object-fit:cover;border-radius:4px}}
 .score-table .product-title{{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .score-red{{border:2px solid #dc3545!important;background:#fff5f5}}
@@ -535,7 +536,7 @@ def product_score_page():
 @media(max-width:768px){{.sidebar{{display:none;position:fixed;top:0;left:0;height:100%;z-index:1000;transform:translateX(-100%);transition:transform .3s}}.sidebar.open{{display:flex;transform:translateX(0)}}
 .menu-toggle{{display:block!important;position:fixed;top:15px;left:15px;z-index:999;background:#667eea;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}}
 .sidebar-overlay{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999}}.sidebar-overlay.open{{display:block}}
-.header{{padding-left:60px}}.search-box{{flex-direction:column}}.search-box input,.search-box button{{width:100%}}}}</style></head>
+.header{{padding-left:60px}}.search-box input{{width:100%;border-radius:8px;border-right:2px solid #e0e0e0}}.search-box button{{width:100%;border-radius:8px;margin-top:10px}}.search-box{{flex-wrap:wrap}}}}</style></head>
 <body><div class="layout">
 {sidebar}
 <main class="main">
@@ -654,7 +655,7 @@ function renderScoreTable(products) {{
     products.forEach(p => {{
         // 상품정보 행
         html += `<tr class="product-row">
-            <td rowspan="2"><img src="${{p.imageUrl || ''}}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23eee%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2230%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2210%22>No IMG</text></svg>'"></td>
+            <td rowspan="2" class="img-cell"><img src="${{p.imageUrl || ''}}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23eee%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2230%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2210%22>No IMG</text></svg>'"></td>
             <td colspan="15" style="text-align:left;padding:10px">
                 <div><strong>상품명:</strong> <span class="product-title" title="${{p.productTitle || ''}}">${{p.productTitle || '-'}}</span></div>
                 <div style="margin-top:3px"><strong>카테고리:</strong> ${{p.category || '-'}} &nbsp;&nbsp; <strong>판매처명:</strong> ${{p.mallName || '-'}}</div>
