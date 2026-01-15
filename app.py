@@ -280,19 +280,19 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .checkbox-col{{width:40px}}input[type="checkbox"]{{width:18px;height:18px;cursor:pointer}}
 .selected-info{{display:none;padding:10px 15px;background:#fff3cd;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between}}
 .selected-info.show{{display:flex}}
+.menu-toggle{{display:none}}
 @media(max-width:768px){{.sidebar{{display:none;position:fixed;top:0;left:0;height:100%;z-index:1000;transform:translateX(-100%);transition:transform .3s}}.sidebar.open{{display:flex;transform:translateX(0)}}
-.menu-toggle{{display:block;position:fixed;top:15px;left:15px;z-index:999;background:#667eea;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}}
+.menu-toggle{{display:block!important;position:fixed;top:15px;left:15px;z-index:999;background:#667eea;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}}
 .sidebar-overlay{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999}}.sidebar-overlay.open{{display:block}}
 .header{{padding-left:60px}}.layout{{flex-direction:column}}
 .table-container table,.table-container thead,.table-container tbody,.table-container th,.table-container td,.table-container tr{{display:block}}
 .table-container thead tr{{position:absolute;top:-9999px;left:-9999px}}
 .table-container tr{{background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:15px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.05)}}
-.table-container td{{border:none;padding:8px 10px;position:relative;padding-left:40%}}
+.table-container td{{border:none;padding:8px 10px;position:relative;padding-left:40%;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:none!important}}
 .table-container td:before{{content:attr(data-label);position:absolute;left:10px;width:35%;font-weight:600;color:#666;font-size:12px}}
 .table-container td:last-child{{text-align:right;padding-left:10px}}.table-container td:last-child:before{{display:none}}
 .checkbox-col{{display:none}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}.btn-group{{width:100%}}.btn-group .btn{{flex:1}}
-.card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}
-.menu-toggle{{display:none}}</style></head>
+.card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}</style></head>
 <body><div class="layout">
 <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
