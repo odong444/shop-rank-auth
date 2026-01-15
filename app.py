@@ -547,7 +547,7 @@ def product_score_page():
 <input type="text" id="searchKeyword" placeholder="검색할 키워드를 입력하세요 (예: 물티슈)">
 <button onclick="searchProducts()" id="searchBtn">검색</button>
 </div>
-<p style="margin-top:10px;font-size:12px;color:#888">* 윈도우 로컬 서버가 실행 중이어야 합니다</p>
+<p style="margin-top:10px;font-size:12px;color:#888">* 작동하지 않으면 좌측 하단의 채널들 중 한곳으로 문의 주세요.</p>
 </div></div>
 
 <div class="card">
