@@ -280,7 +280,15 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .checkbox-col{{width:40px}}input[type="checkbox"]{{width:18px;height:18px;cursor:pointer}}
 .selected-info{{display:none;padding:10px 15px;background:#fff3cd;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between}}
 .selected-info.show{{display:flex}}
-@media(max-width:768px){{.sidebar{{display:none}}.layout{{flex-direction:column}}th,td{{padding:8px 5px;font-size:11px}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}}}</style></head>
+@media(max-width:768px){{.sidebar{{display:none}}.layout{{flex-direction:column}}
+.table-container table,.table-container thead,.table-container tbody,.table-container th,.table-container td,.table-container tr{{display:block}}
+.table-container thead tr{{position:absolute;top:-9999px;left:-9999px}}
+.table-container tr{{background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:15px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.05)}}
+.table-container td{{border:none;padding:8px 10px;position:relative;padding-left:40%}}
+.table-container td:before{{content:attr(data-label);position:absolute;left:10px;width:35%;font-weight:600;color:#666;font-size:12px}}
+.table-container td:last-child{{text-align:right;padding-left:10px}}.table-container td:last-child:before{{display:none}}
+.checkbox-col{{display:none}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}.btn-group{{width:100%}}.btn-group .btn{{flex:1}}
+.card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}</style></head>
 <body><div class="layout">
 <nav class="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
 <ul class="sidebar-menu">
@@ -358,8 +366,8 @@ const prev=parseInt(p.prev_rank),curr=parseInt(p.current_rank);if(!isNaN(prev)&&
 if(diff>0)todayHtml+=` <span class="rank-down">▲${{diff}}</span>`;else if(diff<0)todayHtml+=` <span class="rank-up">▼${{Math.abs(diff)}}</span>`;}}}}
 let firstHtml=p.first_rank==='-'||p.first_rank==='loading'?'<div class="spinner-small"></div>':formatRank(p.first_rank);
 tr.innerHTML=`<td class="checkbox-col"><input type="checkbox" ${{isChecked}} onchange="toggleSelect(${{p.id}})"></td>
-<td>${{p.mall||'-'}}</td><td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{p.title||''}}">${{p.title||'-'}}</td>
-<td>${{p.mid}}</td><td>${{p.keyword}}</td><td id="first-${{p.id}}">${{firstHtml}}</td><td>${{formatRank(p.prev_rank)}}</td><td id="rank-${{p.id}}">${{todayHtml}}</td>
+<td data-label="스토어명">${{p.mall||'-'}}</td><td data-label="상품명" style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${{p.title||''}}">${{p.title||'-'}}</td>
+<td data-label="MID">${{p.mid}}</td><td data-label="키워드">${{p.keyword}}</td><td data-label="최초순위" id="first-${{p.id}}">${{firstHtml}}</td><td data-label="이전순위">${{formatRank(p.prev_rank)}}</td><td data-label="오늘순위" id="rank-${{p.id}}">${{todayHtml}}</td>
 <td><button class="btn btn-info" style="padding:4px 8px;font-size:11px" onclick="showHistory(${{p.id}},'${{p.keyword}}')">이력</button>
 <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteProduct(${{p.id}})">삭제</button></td>`;
 tbody.appendChild(tr);}});
