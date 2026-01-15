@@ -242,7 +242,7 @@ n=document.getElementById('name').value,ph=document.getElementById('phone').valu
 err.style.display='none';suc.style.display='none';if(!u||!p||!p2||!n||!ph){err.textContent='모든 항목을 입력해주세요.';err.style.display='block';return}
 if(p!==p2){err.textContent='비밀번호가 일치하지 않습니다.';err.style.display='block';return}
 try{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:u,password:p,name:n,phone:ph})});const d=await r.json();
-if(d.success){suc.innerHTML='회원가입 완료!<br>관리자 승인 후 사용 가능합니다.<br>문의: 카카오톡 odong4444';suc.style.display='block'}else{err.textContent=d.message;err.style.display='block'}}
+if(d.success){suc.innerHTML='회원가입 완료!<br>로그인해주세요.';suc.style.display='block';setTimeout(()=>location.href='/login',1500)}else{err.textContent=d.message;err.style.display='block'}}
 catch(x){err.textContent='서버 연결 실패';err.style.display='block'}}</script></body></html>'''
 
 @app.route('/dashboard')
@@ -507,7 +507,7 @@ def api_register():
             cur.close()
             conn.close()
             return jsonify({'success': False, 'message': '이미 사용 중인 아이디입니다.'})
-        cur.execute('INSERT INTO users (user_id,password,name,phone) VALUES (%s,%s,%s,%s)', (d.get('userId'), d.get('password'), d.get('name'), d.get('phone')))
+        cur.execute('INSERT INTO users (user_id,password,name,phone,approved) VALUES (%s,%s,%s,%s,%s)', (d.get('userId'), d.get('password'), d.get('name'), d.get('phone'), 'Y'))
         conn.commit()
         cur.close()
         conn.close()
