@@ -228,8 +228,11 @@ def register_page():
 .container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:90%;max-width:400px}h1{text-align:center;margin-bottom:30px}
 .form-group{margin-bottom:15px}.form-group label{display:block;margin-bottom:5px;font-weight:bold;font-size:14px}.form-group input{width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px}
 .btn{width:100%;padding:15px;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px}.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}.btn-secondary{background:#f0f0f0}
-.error,.success{padding:10px;border-radius:10px;margin-bottom:15px;text-align:center;display:none}.error{background:#ffe0e0;color:#c00}.success{background:#e0ffe0;color:#060}</style></head>
-<body><div class="container"><h1>📝 회원가입</h1><div class="error" id="error"></div><div class="success" id="success"></div>
+.error,.success{padding:10px;border-radius:10px;margin-bottom:15px;text-align:center;display:none}.error{background:#ffe0e0;color:#c00}.success{background:#e0ffe0;color:#060}
+.notice-box{background:#fff3cd;color:#856404;padding:12px;border-radius:10px;margin-bottom:20px;font-size:13px;line-height:1.6;border:1px solid #ffc107}</style></head>
+<body><div class="container"><h1>📝 회원가입</h1>
+<div class="notice-box">⚠️ 이름과 연락처는 정확하게 입력해주세요.<br>허위 정보 입력 시 사전 안내 없이 계정이 삭제될 수 있습니다.</div>
+<div class="error" id="error"></div><div class="success" id="success"></div>
 <div class="form-group"><label>아이디</label><input type="text" id="userId"></div>
 <div class="form-group"><label>비밀번호</label><input type="password" id="password"></div>
 <div class="form-group"><label>비밀번호 확인</label><input type="password" id="password2"></div>
