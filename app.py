@@ -280,7 +280,10 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .checkbox-col{{width:40px}}input[type="checkbox"]{{width:18px;height:18px;cursor:pointer}}
 .selected-info{{display:none;padding:10px 15px;background:#fff3cd;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between}}
 .selected-info.show{{display:flex}}
-@media(max-width:768px){{.sidebar{{display:none}}.layout{{flex-direction:column}}
+@media(max-width:768px){{.sidebar{{display:none;position:fixed;top:0;left:0;height:100%;z-index:1000;transform:translateX(-100%);transition:transform .3s}}.sidebar.open{{display:flex;transform:translateX(0)}}
+.menu-toggle{{display:block;position:fixed;top:15px;left:15px;z-index:999;background:#667eea;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}}
+.sidebar-overlay{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999}}.sidebar-overlay.open{{display:block}}
+.header{{padding-left:60px}}.layout{{flex-direction:column}}
 .table-container table,.table-container thead,.table-container tbody,.table-container th,.table-container td,.table-container tr{{display:block}}
 .table-container thead tr{{position:absolute;top:-9999px;left:-9999px}}
 .table-container tr{{background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:15px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.05)}}
@@ -288,9 +291,12 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .table-container td:before{{content:attr(data-label);position:absolute;left:10px;width:35%;font-weight:600;color:#666;font-size:12px}}
 .table-container td:last-child{{text-align:right;padding-left:10px}}.table-container td:last-child:before{{display:none}}
 .checkbox-col{{display:none}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}.btn-group{{width:100%}}.btn-group .btn{{flex:1}}
-.card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}</style></head>
+.card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}
+.menu-toggle{{display:none}}</style></head>
 <body><div class="layout">
-<nav class="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
+<button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
 <ul class="sidebar-menu">
 <li><a href="/dashboard" class="active"><span class="icon">🛍️</span>네이버 쇼핑 순위체크</a></li>
 <li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">🚀</span>쿠팡 순위체크<span class="soon">준비중</span></a></li>
@@ -427,32 +433,75 @@ function exportExcel(){{if(products.length===0){{alert('다운로드할 데이�
 document.getElementById('historyModal').addEventListener('click',function(e){{if(e.target===this)closeModal();}});
 document.getElementById('keyword').addEventListener('keypress',function(e){{if(e.key==='Enter')addProduct();}});
 loadProducts();
+function toggleSidebar(){{const sidebar=document.getElementById('sidebar');const overlay=document.getElementById('sidebarOverlay');sidebar.classList.toggle('open');overlay.classList.toggle('open');}}
 </script></body></html>'''
 
 @app.route('/admin')
 def admin_page():
     if not session.get('admin_logged_in'):
         return redirect('/admin/login')
-    return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>회원 관리</title>
+    return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Malgun Gothic',sans-serif;background:#f5f5f5;padding:20px}
-.container{max-width:1000px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.container{max-width:1200px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
 h1{text-align:center;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:center;border-bottom:1px solid #ddd}
 th{background:#4a90d9;color:#fff}tr:hover{background:#f9f9f9}.btn{padding:6px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px}
 .btn-approve{background:#28a745;color:#fff}.btn-reject{background:#ffc107}.btn-delete{background:#dc3545;color:#fff}
 .refresh-btn{display:block;margin:20px auto;padding:10px 30px;background:#4a90d9;color:#fff;border:none;border-radius:5px;cursor:pointer}
-.back-btn{display:inline-block;margin-bottom:20px;padding:8px 16px;background:#667eea;color:#fff;text-decoration:none;border-radius:5px}
-.logout-btn{display:inline-block;margin-left:10px;padding:8px 16px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px}</style></head>
-<body><div class="container"><a href="/dashboard" class="back-btn">← 대시보드로</a><a href="/admin/logout" class="logout-btn">관리자 로그아웃</a><h1>🔐 회원 관리</h1>
+.top-btns{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
+.top-btns a,.top-btns button{padding:8px 16px;border-radius:5px;text-decoration:none;font-size:14px;border:none;cursor:pointer}
+.back-btn{background:#667eea;color:#fff}.logout-btn{background:#dc3545;color:#fff}
+.tabs{display:flex;border-bottom:2px solid #eee;margin-bottom:20px}.tab{padding:12px 24px;cursor:pointer;border:none;background:none;font-size:14px;color:#666}
+.tab.active{color:#4a90d9;border-bottom:2px solid #4a90d9;margin-bottom:-2px;font-weight:bold}
+.tab-content{display:none}.tab-content.active{display:block}
+.search-box{margin-bottom:15px;display:flex;gap:10px;flex-wrap:wrap}.search-box input,.search-box select{padding:8px 12px;border:1px solid #ddd;border-radius:5px}
+.search-box input{flex:1;min-width:200px}.product-title{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.stats{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}.stat-box{background:#f8f9fa;padding:15px 25px;border-radius:8px;text-align:center}
+.stat-box .num{font-size:24px;font-weight:bold;color:#4a90d9}.stat-box .label{font-size:12px;color:#666}</style></head>
+<body><div class="container">
+<div class="top-btns"><a href="/dashboard" class="back-btn">← 대시보드</a><a href="/admin/logout" class="logout-btn">로그아웃</a></div>
+<h1>🔐 관리자 페이지</h1>
+<div class="stats" id="stats"></div>
+<div class="tabs"><button class="tab active" onclick="showTab('users')">👥 회원 관리</button><button class="tab" onclick="showTab('products')">📦 전체 상품</button></div>
+<div class="tab-content active" id="tab-users">
 <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
-<table><thead><tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>승인</th><th>관리</th></tr></thead><tbody id="userTable"></tbody></table></div>
-<script>async function loadUsers(){try{const r=await fetch('/admin/users');const d=await r.json();if(d.success){const tbody=document.getElementById('userTable');tbody.innerHTML='';
-d.users.forEach(u=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${u.userId}</td><td>${u.name}</td><td>${u.phone}</td><td>${u.regDate}</td>
+<table><thead><tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>상품수</th><th>승인</th><th>관리</th></tr></thead><tbody id="userTable"></tbody></table>
+</div>
+<div class="tab-content" id="tab-products">
+<div class="search-box"><input type="text" id="searchKeyword" placeholder="키워드 또는 스토어명 검색"><select id="filterUser"><option value="">전체 사용자</option></select>
+<button class="btn btn-approve" onclick="loadAllProducts()">검색</button></div>
+<table><thead><tr><th>사용자</th><th>스토어명</th><th>상품명</th><th>MID</th><th>키워드</th><th>현재순위</th><th>등록일</th></tr></thead><tbody id="productTable"></tbody></table>
+</div></div>
+<script>
+function showTab(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+document.querySelector(`.tab-content#tab-${tab}`).classList.add('active');event.target.classList.add('active');if(tab==='products')loadAllProducts();}
+
+async function loadStats(){try{const r=await fetch('/admin/stats');const d=await r.json();if(d.success){
+document.getElementById('stats').innerHTML=`<div class="stat-box"><div class="num">${d.totalUsers}</div><div class="label">전체 회원</div></div>
+<div class="stat-box"><div class="num">${d.approvedUsers}</div><div class="label">승인 회원</div></div>
+<div class="stat-box"><div class="num">${d.totalProducts}</div><div class="label">전체 상품</div></div>
+<div class="stat-box"><div class="num">${d.todayProducts}</div><div class="label">오늘 등록</div></div>`;}}catch(e){}}
+
+async function loadUsers(){try{const r=await fetch('/admin/users');const d=await r.json();if(d.success){const tbody=document.getElementById('userTable');tbody.innerHTML='';
+const select=document.getElementById('filterUser');select.innerHTML='<option value="">전체 사용자</option>';
+d.users.forEach(u=>{select.innerHTML+=`<option value="${u.userId}">${u.userId} (${u.name})</option>`;
+const tr=document.createElement('tr');tr.innerHTML=`<td>${u.userId}</td><td>${u.name}</td><td>${u.phone}</td><td>${u.regDate}</td><td>${u.productCount||0}개</td>
 <td style="color:${u.approved==='Y'?'#28a745':'#dc3545'};font-weight:bold">${u.approved==='Y'?'승인됨':'대기중'}</td>
 <td>${u.approved==='Y'?`<button class="btn btn-reject" onclick="setApproval('${u.userId}','N')">승인취소</button>`:`<button class="btn btn-approve" onclick="setApproval('${u.userId}','Y')">승인</button>`}
 <button class="btn btn-delete" onclick="deleteUser('${u.userId}')">삭제</button></td>`;tbody.appendChild(tr);});}}catch(e){alert('로드 실패');}}
+
+async function loadAllProducts(){try{const kw=document.getElementById('searchKeyword').value;const user=document.getElementById('filterUser').value;
+const r=await fetch(`/admin/all-products?keyword=${encodeURIComponent(kw)}&user=${encodeURIComponent(user)}`);const d=await r.json();
+if(d.success){const tbody=document.getElementById('productTable');tbody.innerHTML='';
+d.products.forEach(p=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${p.userId}</td><td>${p.mall||'-'}</td>
+<td class="product-title" title="${p.title||''}">${p.title||'-'}</td><td>${p.mid}</td><td>${p.keyword}</td>
+<td>${p.currentRank||'-'}</td><td>${p.createdAt||'-'}</td>`;tbody.appendChild(tr);});
+if(d.products.length===0)tbody.innerHTML='<tr><td colspan="7">등록된 상품이 없습니다.</td></tr>';}}catch(e){alert('로드 실패');}}
+
 async function setApproval(id,ap){const r=await fetch('/admin/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id,approved:ap})});const d=await r.json();if(d.success)loadUsers();else alert(d.message);}
-async function deleteUser(id){if(!confirm(id+' 회원을 삭제하시겠습니까?'))return;const r=await fetch('/admin/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id})});const d=await r.json();if(d.success)loadUsers();else alert(d.message);}
-loadUsers();</script></body></html>'''
+async function deleteUser(id){if(!confirm(id+' 회원을 삭제하시겠습니까?'))return;const r=await fetch('/admin/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id})});const d=await r.json();if(d.success){loadUsers();loadStats();}else alert(d.message);}
+document.getElementById('searchKeyword').addEventListener('keypress',e=>{if(e.key==='Enter')loadAllProducts();});
+loadStats();loadUsers();
+</script></body></html>'''
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -794,11 +843,60 @@ def get_users():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute('SELECT id,user_id,name,phone,reg_date,approved FROM users ORDER BY id DESC')
+        cur.execute('''SELECT u.id, u.user_id, u.name, u.phone, u.reg_date, u.approved,
+                      (SELECT COUNT(*) FROM products p WHERE p.user_id = u.user_id) as product_count
+                      FROM users u ORDER BY u.id DESC''')
         rows = cur.fetchall()
         cur.close()
         conn.close()
-        return jsonify({'success': True, 'users': [{'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3], 'regDate': str(r[4]) if r[4] else '', 'approved': r[5]} for r in rows]})
+        return jsonify({'success': True, 'users': [{'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3], 'regDate': str(r[4]) if r[4] else '', 'approved': r[5], 'productCount': r[6]} for r in rows]})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/stats', methods=['GET'])
+def get_admin_stats():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT COUNT(*) FROM users')
+        total_users = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE approved='Y'")
+        approved_users = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM products')
+        total_products = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM products WHERE DATE(created_at) = CURRENT_DATE")
+        today_products = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'totalUsers': total_users, 'approvedUsers': approved_users, 'totalProducts': total_products, 'todayProducts': today_products})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/all-products', methods=['GET'])
+def get_all_products():
+    try:
+        keyword = request.args.get('keyword', '')
+        user_filter = request.args.get('user', '')
+        conn = get_db()
+        cur = conn.cursor()
+        query = '''SELECT user_id, mall, title, mid, keyword, current_rank, created_at FROM products WHERE 1=1'''
+        params = []
+        if keyword:
+            query += ' AND (keyword ILIKE %s OR mall ILIKE %s OR title ILIKE %s)'
+            params.extend([f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'])
+        if user_filter:
+            query += ' AND user_id = %s'
+            params.append(user_filter)
+        query += ' ORDER BY created_at DESC LIMIT 500'
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        products = []
+        for r in rows:
+            created = r[6].strftime('%Y-%m-%d %H:%M') if r[6] else ''
+            products.append({'userId': r[0], 'mall': r[1], 'title': r[2], 'mid': r[3], 'keyword': r[4], 'currentRank': r[5], 'createdAt': created})
+        return jsonify({'success': True, 'products': products})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
