@@ -30,7 +30,10 @@ CACHE_DURATION_MINUTES = 60
 # 알리고 SMS 설정
 ALIGO_API_KEY = "3xj66vap7q84cvvqfwugklcxpu7srvrf"
 ALIGO_USER_ID = "odong444"
-ALIGO_SENDER = "01072100210"  # 캐시 유지 시간 (1시간)
+ALIGO_SENDER = "01072100210"
+
+# [신규] 윈도우 로컬 서버 (상세 점수 조회 담당)
+RANK_API_URL = 'https://bat-loved-independence-attachments.trycloudflare.com'
 
 def get_db():
     return psycopg.connect(DATABASE_URL)
@@ -54,14 +57,12 @@ def init_db():
         id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
         rank VARCHAR(20) NOT NULL, checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # 키워드 캐시 테이블
     cur.execute('''CREATE TABLE IF NOT EXISTS keyword_cache (
         id SERIAL PRIMARY KEY,
         keyword VARCHAR(100) UNIQUE NOT NULL,
         search_results TEXT,
         cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # SMS 인증 테이블
     cur.execute('''CREATE TABLE IF NOT EXISTS sms_verify (
         id SERIAL PRIMARY KEY,
         phone VARCHAR(20) NOT NULL,
@@ -70,7 +71,6 @@ def init_db():
         verified BOOLEAN DEFAULT FALSE)''')
     conn.commit()
     
-    # 기존 테이블에 새 컬럼 추가
     for col in [("first_rank", "VARCHAR(20) DEFAULT '-'"), ("prev_rank", "VARCHAR(20) DEFAULT '-'"), ("last_checked", "TIMESTAMP")]:
         try:
             cur.execute(f"ALTER TABLE products ADD COLUMN {col[0]} {col[1]}")
@@ -90,7 +90,6 @@ def login_required(f):
     return decorated
 
 def send_aligo_sms(phone, message):
-    """알리고 SMS 발송"""
     try:
         url = "https://apis.aligo.in/send/"
         data = {
@@ -110,7 +109,6 @@ def send_aligo_sms(phone, message):
         return False
 
 def get_naver_search_results(keyword):
-    """네이버 API로 300위까지 검색 결과 가져오기"""
     results = []
     try:
         enc = urllib.parse.quote(keyword)
@@ -137,7 +135,6 @@ def get_naver_search_results(keyword):
     return results
 
 def get_cached_results(keyword):
-    """캐시된 검색 결과 가져오기 (1시간 이내)"""
     conn = get_db()
     cur = conn.cursor()
     cur.execute('SELECT search_results, cached_at FROM keyword_cache WHERE keyword=%s', (keyword,))
@@ -155,7 +152,6 @@ def get_cached_results(keyword):
     return None
 
 def save_cache(keyword, results):
-    """검색 결과 캐시 저장"""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -172,17 +168,14 @@ def save_cache(keyword, results):
         conn.close()
 
 def update_all_products_with_keyword(keyword, results):
-    """해당 키워드를 가진 모든 사용자의 상품 순위 업데이트"""
     if not results:
         return 0
     
-    # mid -> result 매핑
     mid_map = {r['mid']: r for r in results}
     
     conn = get_db()
     cur = conn.cursor()
     
-    # 해당 키워드를 가진 모든 상품 조회
     cur.execute('SELECT id, mid, first_rank FROM products WHERE keyword=%s', (keyword,))
     products = cur.fetchall()
     
@@ -199,7 +192,6 @@ def update_all_products_with_keyword(keyword, results):
             cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, rank_str))
             updated += 1
         else:
-            # 300위 밖
             cur.execute('''UPDATE products SET prev_rank=current_rank, current_rank=%s, last_checked=NOW() WHERE id=%s''',
                        ('300위 밖', pid))
             cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, '300위 밖'))
@@ -211,24 +203,52 @@ def update_all_products_with_keyword(keyword, results):
     return updated
 
 def get_naver_rank(keyword, target_mid):
-    """단일 상품 순위 조회 (캐시 활용)"""
-    # 캐시 확인
     results = get_cached_results(keyword)
     
     if not results:
-        # 캐시 없으면 API 호출
         results = get_naver_search_results(keyword)
         if results:
             save_cache(keyword, results)
-            # 같은 키워드의 다른 상품들도 업데이트
             update_all_products_with_keyword(keyword, results)
     
-    # 결과에서 해당 MID 찾기
     for r in results:
         if r['mid'] == str(target_mid):
             return r['rank'], r['title'], r['mall']
     
     return None, None, None
+
+
+# ===== 사이드바 공통 HTML =====
+def get_sidebar_html(active_menu='dashboard'):
+    name = session.get('name', '')
+    menus = [
+        ('dashboard', '/dashboard', '🛍️', '네이버 쇼핑 순위체크', False),
+        ('product-score', '/product-score', '📊', '상품지수 조회', False),
+        ('coupang', '#', '🚀', '쿠팡 순위체크', True),
+        ('place', '#', '📍', '네이버 플레이스', True),
+    ]
+    
+    menu_html = ''
+    for key, href, icon, label, disabled in menus:
+        if disabled:
+            menu_html += f'<li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">{icon}</span>{label}<span class="soon">준비중</span></a></li>'
+        else:
+            active_class = ' class="active"' if key == active_menu else ''
+            menu_html += f'<li><a href="{href}"{active_class}><span class="icon">{icon}</span>{label}</a></li>'
+    
+    return f'''<button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
+<ul class="sidebar-menu">{menu_html}</ul>
+<div class="sidebar-contact">
+<p style="color:#888;font-size:12px;margin-bottom:10px;padding:0 15px">📞 문의하기</p>
+<a href="http://pf.kakao.com/_HcdEn" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">리뷰작업 문의</a>
+<a href="http://pf.kakao.com/_xkKUnxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">네이버 트래픽 문의</a>
+<a href="http://pf.kakao.com/_xayNxjG" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">쿠팡 트래픽 문의</a>
+<a href="http://pf.kakao.com/_NxfIxfxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">체험단 문의</a>
+</div>
+<div class="sidebar-footer"><a href="/api/logout">🚪 로그아웃</a></div></nav>'''
+
 
 # ===== HTML PAGES =====
 
@@ -292,6 +312,7 @@ catch(x){err.textContent='서버 연결 실패';err.style.display='block'}}
 @login_required
 def dashboard_page():
     name = session.get('name', '')
+    sidebar = get_sidebar_html('dashboard')
     return f'''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>대시보드</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Malgun Gothic',sans-serif;background:#f5f7fa;min-height:100vh}}
 .layout{{display:flex;min-height:100vh}}.sidebar{{width:250px;background:linear-gradient(180deg,#2c3e50,#1a252f);color:#fff;padding:20px 0;flex-shrink:0;display:flex;flex-direction:column}}
@@ -337,22 +358,7 @@ th{{background:#f8f9fa;color:#555;font-weight:600;white-space:nowrap}}.rank-up{{
 .checkbox-col{{display:none}}.form-row{{flex-direction:column}}.form-row input,.form-row button{{width:100%}}.btn-group{{width:100%}}.btn-group .btn{{flex:1}}
 .card-header{{flex-direction:column;align-items:flex-start}}.card-header h3{{margin-bottom:10px}}}}</style></head>
 <body><div class="layout">
-<button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-<nav class="sidebar" id="sidebar"><div class="sidebar-header"><h1>🛒 순위 관리</h1><p>Rank Tracker</p></div>
-<ul class="sidebar-menu">
-<li><a href="/dashboard" class="active"><span class="icon">🛍️</span>네이버 쇼핑 순위체크</a></li>
-<li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">🚀</span>쿠팡 순위체크<span class="soon">준비중</span></a></li>
-<li><a href="#" style="opacity:.5;cursor:not-allowed"><span class="icon">📍</span>네이버 플레이스<span class="soon">준비중</span></a></li>
-</ul>
-<div class="sidebar-contact">
-<p style="color:#888;font-size:12px;margin-bottom:10px;padding:0 15px">📞 문의하기</p>
-<a href="http://pf.kakao.com/_HcdEn" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">리뷰작업 문의</a>
-<a href="http://pf.kakao.com/_xkKUnxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">네이버 트래픽 문의</a>
-<a href="http://pf.kakao.com/_xayNxjG" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">쿠팡 트래픽 문의</a>
-<a href="http://pf.kakao.com/_NxfIxfxj" target="_blank" class="contact-btn"><img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">체험단 문의</a>
-</div>
-<div class="sidebar-footer"><a href="/api/logout">🚪 로그아웃</a></div></nav>
+{sidebar}
 <main class="main">
 <header class="header"><h2>🛍️ 네이버 쇼핑 순위체크</h2><div style="font-size:14px;color:#666">👤 {name}님</div></header>
 <div class="content">
@@ -478,6 +484,224 @@ document.getElementById('keyword').addEventListener('keypress',function(e){{if(e
 loadProducts();
 function toggleSidebar(){{const sidebar=document.getElementById('sidebar');const overlay=document.getElementById('sidebarOverlay');sidebar.classList.toggle('open');overlay.classList.toggle('open');}}
 </script></body></html>'''
+
+
+# ===== 상품지수 조회 페이지 =====
+@app.route('/product-score')
+@login_required
+def product_score_page():
+    name = session.get('name', '')
+    sidebar = get_sidebar_html('product-score')
+    return f'''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>상품지수 조회</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Malgun Gothic',sans-serif;background:#f5f7fa;min-height:100vh}}
+.layout{{display:flex;min-height:100vh}}.sidebar{{width:250px;background:linear-gradient(180deg,#2c3e50,#1a252f);color:#fff;padding:20px 0;flex-shrink:0;display:flex;flex-direction:column}}
+.sidebar-header{{padding:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:20px}}.sidebar-header h1{{font-size:18px}}.sidebar-header p{{font-size:12px;color:#888}}
+.sidebar-menu{{list-style:none}}.sidebar-menu li{{margin:5px 10px}}.sidebar-menu a{{display:flex;align-items:center;padding:12px 15px;color:#ccc;text-decoration:none;border-radius:8px;font-size:14px}}
+.sidebar-menu a:hover{{background:rgba(255,255,255,.1);color:#fff}}.sidebar-menu a.active{{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}}
+.sidebar-menu .icon{{margin-right:10px;font-size:18px}}.sidebar-menu .soon{{margin-left:auto;font-size:11px;color:#666}}
+.sidebar-footer{{padding:20px;border-top:1px solid rgba(255,255,255,.1)}}.sidebar-footer a{{color:#888;text-decoration:none;font-size:13px}}
+.sidebar-contact{{padding:10px;margin-top:auto;border-top:1px solid rgba(255,255,255,.1)}}.contact-btn{{display:flex;align-items:center;padding:8px 15px;margin:5px 10px;background:rgba(255,255,255,.05);border-radius:8px;color:#ccc;text-decoration:none;font-size:12px;transition:all .2s}}.contact-btn:hover{{background:#fee500;color:#000}}.contact-btn img{{width:20px;height:20px;margin-right:8px;border-radius:4px}}
+.main{{flex:1;display:flex;flex-direction:column}}.header{{background:#fff;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}}
+.header h2{{font-size:18px}}.content{{flex:1;padding:25px;overflow-y:auto}}
+.card{{background:#fff;border-radius:12px;box-shadow:0 2px 15px rgba(0,0,0,.05);margin-bottom:20px}}.card-header{{padding:20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}}
+.card-header h3{{font-size:16px}}.card-body{{padding:20px}}
+.search-box{{display:flex;gap:10px;align-items:center;flex-wrap:wrap}}
+.search-box input{{flex:1;min-width:300px;padding:12px 15px;border:2px solid #e0e0e0;border-radius:8px;font-size:15px}}
+.search-box input:focus{{outline:none;border-color:#667eea}}
+.search-box button{{padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px}}
+.search-box button:disabled{{background:#ccc;cursor:not-allowed}}
+.result-info{{margin:15px 0;font-size:14px;color:#666}}
+.score-table{{width:100%;border-collapse:collapse;font-size:12px}}
+.score-table th,.score-table td{{padding:8px 6px;text-align:center;border:1px solid #e0e0e0}}
+.score-table th{{background:#f8f9fa;font-weight:600;white-space:nowrap;position:sticky;top:0}}
+.score-table .product-row{{background:#f0f4ff}}
+.score-table .product-row td{{text-align:left;font-size:11px;color:#555}}
+.score-table .data-row td{{font-size:12px}}
+.score-table .product-img{{width:50px;height:50px;object-fit:cover;border-radius:4px}}
+.score-table .product-title{{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.score-red{{border:2px solid #dc3545!important;background:#fff5f5}}
+.score-yellow{{background:#fff9e6}}
+.score-good{{color:#28a745;font-weight:bold}}
+.score-bad{{color:#dc3545;font-weight:bold}}
+.loading{{text-align:center;padding:60px 20px;color:#666}}
+.spinner{{display:inline-block;width:40px;height:40px;border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;animation:spin 1s linear infinite}}
+@keyframes spin{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(360deg)}}}}
+.empty{{text-align:center;padding:60px 20px;color:#888}}.empty-icon{{font-size:50px;margin-bottom:15px}}
+.table-scroll{{max-height:70vh;overflow:auto}}
+.server-status{{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:15px;font-size:12px}}
+.server-status.online{{background:#d4edda;color:#155724}}
+.server-status.offline{{background:#f8d7da;color:#721c24}}
+.menu-toggle{{display:none}}
+@media(max-width:768px){{.sidebar{{display:none;position:fixed;top:0;left:0;height:100%;z-index:1000;transform:translateX(-100%);transition:transform .3s}}.sidebar.open{{display:flex;transform:translateX(0)}}
+.menu-toggle{{display:block!important;position:fixed;top:15px;left:15px;z-index:999;background:#667eea;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}}
+.sidebar-overlay{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999}}.sidebar-overlay.open{{display:block}}
+.header{{padding-left:60px}}.search-box{{flex-direction:column}}.search-box input,.search-box button{{width:100%}}}}</style></head>
+<body><div class="layout">
+{sidebar}
+<main class="main">
+<header class="header"><h2>📊 상품지수 조회</h2><div style="display:flex;align-items:center;gap:15px"><span id="serverStatus" class="server-status offline">● 서버 확인중</span><span style="font-size:14px;color:#666">👤 {name}님</span></div></header>
+<div class="content">
+<div class="card"><div class="card-header"><h3>🔍 키워드 검색</h3></div>
+<div class="card-body">
+<div class="search-box">
+<input type="text" id="searchKeyword" placeholder="검색할 키워드를 입력하세요 (예: 물티슈)">
+<button onclick="searchProducts()" id="searchBtn">검색</button>
+</div>
+<p style="margin-top:10px;font-size:12px;color:#888">* 윈도우 로컬 서버가 실행 중이어야 합니다</p>
+</div></div>
+
+<div class="card">
+<div class="card-header"><h3>📋 검색 결과 <span id="resultCount" style="color:#667eea"></span></h3></div>
+<div class="card-body">
+<div id="loading" class="loading" style="display:none"><div class="spinner"></div><p>검색 중...</p></div>
+<div id="resultArea">
+<div class="empty"><div class="empty-icon">🔍</div><p>키워드를 입력하고 검색하세요.<br>상품별 상세 점수를 확인할 수 있습니다.</p></div>
+</div>
+</div></div>
+</div>
+</main></div>
+<script>
+const RANK_API_URL = 'https://bat-loved-independence-attachments.trycloudflare.com';
+
+// 서버 상태 체크
+async function checkServer() {{
+    const status = document.getElementById('serverStatus');
+    try {{
+        const r = await fetch(RANK_API_URL + '/health', {{method:'GET',mode:'cors'}});
+        if(r.ok) {{
+            status.className = 'server-status online';
+            status.textContent = '● 서버 연결됨';
+            return true;
+        }}
+    }} catch(e) {{}}
+    status.className = 'server-status offline';
+    status.textContent = '● 서버 오프라인';
+    return false;
+}}
+
+async function searchProducts() {{
+    const keyword = document.getElementById('searchKeyword').value.trim();
+    const btn = document.getElementById('searchBtn');
+    const loading = document.getElementById('loading');
+    const resultArea = document.getElementById('resultArea');
+    const resultCount = document.getElementById('resultCount');
+    
+    if(!keyword) {{
+        alert('검색 키워드를 입력해주세요.');
+        return;
+    }}
+    
+    // 서버 체크
+    const serverOk = await checkServer();
+    if(!serverOk) {{
+        alert('로컬 서버에 연결할 수 없습니다.\\n윈도우 서버가 실행 중인지 확인해주세요.');
+        return;
+    }}
+    
+    btn.disabled = true;
+    btn.textContent = '검색 중...';
+    loading.style.display = 'block';
+    resultArea.innerHTML = '';
+    resultCount.textContent = '';
+    
+    try {{
+        const r = await fetch(RANK_API_URL + '/api/product-score?keyword=' + encodeURIComponent(keyword), {{
+            method: 'GET',
+            mode: 'cors',
+            headers: {{'Accept': 'application/json'}}
+        }});
+        const d = await r.json();
+        
+        if(d.result && d.result.products && d.result.products.length > 0) {{
+            resultCount.textContent = `(${{d.result.products.length}}개)`;
+            renderScoreTable(d.result.products);
+        }} else {{
+            resultArea.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>검색 결과가 없습니다.</p></div>';
+        }}
+    }} catch(e) {{
+        console.error(e);
+        resultArea.innerHTML = '<div class="empty" style="color:#c00"><div class="empty-icon">⚠️</div><p>검색 중 오류가 발생했습니다.<br>서버 연결을 확인해주세요.</p></div>';
+    }} finally {{
+        btn.disabled = false;
+        btn.textContent = '검색';
+        loading.style.display = 'none';
+    }}
+}}
+
+function renderScoreTable(products) {{
+    const resultArea = document.getElementById('resultArea');
+    
+    let html = `<div class="table-scroll"><table class="score-table">
+    <thead><tr>
+        <th rowspan="2">이미지</th>
+        <th rowspan="2">순위</th>
+        <th rowspan="2">판매처수</th>
+        <th rowspan="2">가격</th>
+        <th rowspan="2">찜수</th>
+        <th rowspan="2">리뷰수</th>
+        <th rowspan="2">구매건수</th>
+        <th class="score-red">종합점수</th>
+        <th>적합도</th>
+        <th class="score-yellow">인기도</th>
+        <th>클릭점수</th>
+        <th>판매점수</th>
+        <th>리뷰점수</th>
+        <th>최신성</th>
+        <th>신뢰성</th>
+        <th>패널티등급</th>
+    </tr></thead><tbody>`;
+    
+    products.forEach(p => {{
+        // 상품정보 행
+        html += `<tr class="product-row">
+            <td rowspan="2"><img src="${{p.imageUrl || ''}}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23eee%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2230%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2210%22>No IMG</text></svg>'"></td>
+            <td colspan="15" style="text-align:left;padding:10px">
+                <div><strong>상품명:</strong> <span class="product-title" title="${{p.productTitle || ''}}">${{p.productTitle || '-'}}</span></div>
+                <div style="margin-top:3px"><strong>카테고리:</strong> ${{p.category || '-'}} &nbsp;&nbsp; <strong>판매처명:</strong> ${{p.mallName || '-'}}</div>
+            </td>
+        </tr>`;
+        
+        // 데이터 행
+        html += `<tr class="data-row">
+            <td>${{p.rank || '-'}}</td>
+            <td>${{p.mallCount || 0}}</td>
+            <td>${{formatNumber(p.lowPrice)}}</td>
+            <td>${{formatNumber(p.keepCnt)}}</td>
+            <td>${{formatNumber(p.reviewCount)}}</td>
+            <td>${{formatNumber(p.purchaseCnt)}}</td>
+            <td class="score-red">${{p.relevanceStarScore || 0}}</td>
+            <td>${{p.similarityStarScore || 0}}</td>
+            <td class="score-yellow">${{p.hitStarScore || 0}}</td>
+            <td>${{p.qualityStarScore || 0}}</td>
+            <td>${{p.saleStarScore || 0}}</td>
+            <td>${{p.reviewCountStarScore || 0}}</td>
+            <td>${{p.recentStarScore || 0}}</td>
+            <td class="${{p.reliabilityType === 'GOOD' ? 'score-good' : ''}}">${{p.reliabilityType || '-'}}</td>
+            <td class="${{p.rankDownScoreType === 'GOOD' ? 'score-good' : (p.rankDownScoreType === 'BAD' ? 'score-bad' : '')}}">${{p.rankDownScoreType || '-'}}</td>
+        </tr>`;
+    }});
+    
+    html += '</tbody></table></div>';
+    resultArea.innerHTML = html;
+}}
+
+function formatNumber(num) {{
+    if(num === undefined || num === null) return '-';
+    return Number(num).toLocaleString();
+}}
+
+// 엔터키 검색
+document.getElementById('searchKeyword').addEventListener('keypress', function(e) {{
+    if(e.key === 'Enter') searchProducts();
+}});
+
+// 페이지 로드시 서버 상태 체크
+checkServer();
+setInterval(checkServer, 30000); // 30초마다 체크
+
+function toggleSidebar(){{const sidebar=document.getElementById('sidebar');const overlay=document.getElementById('sidebarOverlay');sidebar.classList.toggle('open');overlay.classList.toggle('open');}}
+</script></body></html>'''
+
 
 @app.route('/admin')
 def admin_page():
@@ -608,13 +832,6 @@ def api_register():
             conn.close()
             return jsonify({'success': False, 'message': '이미 사용 중인 아이디입니다.'})
         phone = d.get('phone', '').replace('-', '')
-        # SMS 인증 체크 (현재 비활성화)
-        # cur.execute("SELECT verified FROM sms_verify WHERE phone=%s ORDER BY created_at DESC LIMIT 1", (phone,))
-        # verify_row = cur.fetchone()
-        # if not verify_row or not verify_row[0]:
-        #     cur.close()
-        #     conn.close()
-        #     return jsonify({'success': False, 'message': '휴대폰 인증이 필요합니다.'})
         cur.execute('INSERT INTO users (user_id,password,name,phone,approved) VALUES (%s,%s,%s,%s,%s)', (d.get('userId'), d.get('password'), d.get('name'), phone, 'Y'))
         conn.commit()
         cur.close()
@@ -630,16 +847,12 @@ def api_send_sms():
     if not phone:
         return jsonify({'success': False, 'message': '전화번호를 입력해주세요.'})
     
-    # 6자리 인증번호 생성
     code = str(random.randint(100000, 999999))
     
-    # DB에 저장
     try:
         conn = get_db()
         cur = conn.cursor()
-        # 기존 인증번호 삭제
         cur.execute('DELETE FROM sms_verify WHERE phone=%s', (phone,))
-        # 새 인증번호 저장
         cur.execute('INSERT INTO sms_verify (phone, code) VALUES (%s, %s)', (phone, code))
         conn.commit()
         cur.close()
@@ -647,7 +860,6 @@ def api_send_sms():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
     
-    # SMS 발송
     message = f"[BW-rank] 인증번호는 [{code}] 입니다."
     if send_aligo_sms(phone, message):
         return jsonify({'success': True})
@@ -666,7 +878,6 @@ def api_verify_sms():
     try:
         conn = get_db()
         cur = conn.cursor()
-        # 3분 이내 인증번호 확인
         cur.execute('''SELECT id, code FROM sms_verify 
                       WHERE phone=%s AND created_at > NOW() - INTERVAL '3 minutes' 
                       ORDER BY created_at DESC LIMIT 1''', (phone,))
@@ -682,7 +893,6 @@ def api_verify_sms():
             conn.close()
             return jsonify({'success': False, 'message': '인증번호가 일치하지 않습니다.'})
         
-        # 인증 완료 처리
         cur.execute('UPDATE sms_verify SET verified=TRUE WHERE id=%s', (row[0],))
         conn.commit()
         cur.close()
@@ -835,7 +1045,6 @@ def check_single_rank(pid):
         rank, title, mall = get_naver_rank(kw, mid)
         rank_str = str(rank) if rank else '300위 밖'
         
-        # 최초순위가 없으면 설정
         if first_rank == '-':
             first_rank = rank_str
         
@@ -911,7 +1120,6 @@ def refresh_ranks():
         cur.close()
         conn.close()
         
-        # 키워드별로 그룹화
         keyword_products = {}
         for r in rows:
             pid, mid, kw = r
@@ -921,7 +1129,6 @@ def refresh_ranks():
         
         updated = 0
         for kw, prods in keyword_products.items():
-            # 캐시 확인
             results = get_cached_results(kw)
             if not results:
                 results = get_naver_search_results(kw)
@@ -929,7 +1136,6 @@ def refresh_ranks():
                     save_cache(kw, results)
                 time.sleep(0.2)
             
-            # 해당 키워드의 모든 상품 업데이트 (다른 사용자 포함)
             updated += update_all_products_with_keyword(kw, results)
         
         return jsonify({'success': True, 'updated': updated})
@@ -1048,7 +1254,6 @@ def delete_user():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
-# 기존 클라이언트 호환
 @app.route('/register', methods=['POST'])
 def register_compat():
     return api_register()
