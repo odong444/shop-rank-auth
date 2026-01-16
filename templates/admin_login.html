@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>관리자 로그인</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-bg">
+<div class="auth-container" style="max-width:350px">
+    <h1 style="font-size:20px">🔐 관리자 로그인</h1>
+    {% if error %}
+    <p class="error" style="display:block">비밀번호가 틀렸습니다.</p>
+    {% endif %}
+    <form method="POST">
+        <div class="form-group">
+            <input type="password" name="password" placeholder="관리자 비밀번호">
+        </div>
+        <button type="submit" class="auth-btn auth-btn-primary">로그인</button>
+    </form>
+</div>
+</body>
+</html>
