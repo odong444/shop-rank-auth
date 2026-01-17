@@ -23,7 +23,7 @@
             <button onclick="bulkUpload()" id="bulkBtn" style="background:#FF9800;color:#fff">📁 대량등록</button>
             <button onclick="downloadSample()" style="background:#6c757d;color:#fff">📥 샘플파일</button>
         </div>
-        <p style="margin-top:10px;font-size:12px;color:#888">* 등록 후 순위가 자동으로 조회됩니다 (개별 로딩)</p>
+        <p style="margin-top:10px;font-size:12px;color:#888">* MID 추출은 로컬 서버가 실행 중이어야 합니다</p>
     </div>
 </div>
 
@@ -92,7 +92,10 @@
 let products = [];
 let selectedIds = new Set();
 
-// 스마트스토어 링크에서 MID 추출
+// 로컬 서버 URL (상품지수 조회와 동일)
+const RANK_API_URL = '{{ rank_api_url }}';
+
+// 스마트스토어 링크에서 MID 추출 (로컬 서버 사용)
 async function extractMid() {
     const url = document.getElementById('smartstoreUrl').value.trim();
     const btn = document.getElementById('extractBtn');
@@ -111,7 +114,12 @@ async function extractMid() {
     btn.textContent = '추출 중...';
     
     try {
-        const r = await fetch('/api/extract-mid?url=' + encodeURIComponent(url));
+        // 로컬 서버의 extract-mid API 호출
+        const r = await fetch(RANK_API_URL + '/api/extract-mid?url=' + encodeURIComponent(url), {
+            method: 'GET',
+            mode: 'cors',
+            headers: {'Accept': 'application/json'}
+        });
         const d = await r.json();
         
         if (d.success) {
@@ -123,7 +131,8 @@ async function extractMid() {
             alert('❌ 추출 실패: ' + d.error);
         }
     } catch(e) {
-        alert('서버 연결 실패');
+        console.error(e);
+        alert('❌ 로컬 서버 연결 실패\n\n윈도우에서 integrated_server.py가 실행 중인지 확인해주세요.');
     } finally {
         btn.disabled = false;
         btn.textContent = 'MID 추출';
