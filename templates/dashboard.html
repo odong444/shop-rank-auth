@@ -7,6 +7,12 @@
 <div class="card">
     <div class="card-header"><h3>➕ 상품 등록</h3></div>
     <div class="card-body">
+        <!-- 스마트스토어 링크로 MID 추출 -->
+        <div class="form-row" style="margin-bottom:15px;padding-bottom:15px;border-bottom:1px dashed #ddd">
+            <input type="text" id="smartstoreUrl" placeholder="🔗 스마트스토어 링크 붙여넣기 (예: https://smartstore.naver.com/store/products/123456)" style="flex:2">
+            <button onclick="extractMid()" id="extractBtn" style="background:#03c75a;color:#fff">MID 추출</button>
+        </div>
+        
         <div class="form-row" style="margin-bottom:15px">
             <input type="text" id="mid" placeholder="MID (상품번호)">
             <input type="text" id="keyword" placeholder="검색 키워드">
@@ -85,6 +91,51 @@
 <script>
 let products = [];
 let selectedIds = new Set();
+
+// 스마트스토어 링크에서 MID 추출
+async function extractMid() {
+    const url = document.getElementById('smartstoreUrl').value.trim();
+    const btn = document.getElementById('extractBtn');
+    
+    if (!url) {
+        alert('스마트스토어 링크를 입력해주세요.');
+        return;
+    }
+    
+    if (!url.includes('naver.com')) {
+        alert('네이버 스마트스토어 링크를 입력해주세요.');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = '추출 중...';
+    
+    try {
+        const r = await fetch('/api/extract-mid?url=' + encodeURIComponent(url));
+        const d = await r.json();
+        
+        if (d.success) {
+            document.getElementById('mid').value = d.mid;
+            document.getElementById('smartstoreUrl').value = '';
+            document.getElementById('keyword').focus();
+            alert('✅ MID 추출 완료: ' + d.mid + '\n\n키워드를 입력하고 등록하기를 눌러주세요.');
+        } else {
+            alert('❌ 추출 실패: ' + d.error);
+        }
+    } catch(e) {
+        alert('서버 연결 실패');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'MID 추출';
+    }
+}
+
+// Enter 키로 MID 추출
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('smartstoreUrl').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') extractMid();
+    });
+});
 
 async function loadProducts() {
     try {
