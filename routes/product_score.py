@@ -5,7 +5,7 @@ import os
 product_score_bp = Blueprint('product_score', __name__)
 
 # 로컬 서버 URL
-RANK_API_URL = os.environ.get('RANK_API_URL', 'https://bat-loved-independence-attachments.trycloudflare.com')
+RANK_API_URL = os.environ.get('RANK_API_URL', '')
 
 def login_required(f):
     @wraps(f)
