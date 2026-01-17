@@ -6,7 +6,8 @@ import time
 import csv
 import io
 import re
-import requests as http_requests
+import urllib.request
+import urllib.error
 
 from utils.db import get_db
 from utils.naver_api import get_naver_rank, get_naver_search_results, get_cached_results, save_cache, update_all_products_with_keyword
@@ -53,13 +54,12 @@ def extract_mid():
             'Referer': 'https://smartstore.naver.com/',
         }
         
-        resp = http_requests.get(url, headers=headers, timeout=10)
-        
-        if resp.status_code != 200:
-            return jsonify({'success': False, 'error': f'페이지 로드 실패: {resp.status_code}'})
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode('utf-8')
         
         # syncNvMid 패턴으로 추출 (가장 확실한 방법)
-        match = re.search(r'"syncNvMid"\s*:\s*(\d+)', resp.text)
+        match = re.search(r'"syncNvMid"\s*:\s*(\d+)', html)
         
         if match:
             mid = match.group(1)
@@ -67,8 +67,8 @@ def extract_mid():
         
         return jsonify({'success': False, 'error': 'MID를 찾을 수 없습니다. (syncNvMid 패턴 없음)'})
         
-    except http_requests.Timeout:
-        return jsonify({'success': False, 'error': '요청 시간 초과'})
+    except urllib.error.URLError as e:
+        return jsonify({'success': False, 'error': f'요청 실패: {str(e)}'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
