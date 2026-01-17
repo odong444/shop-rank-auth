@@ -14,7 +14,7 @@ dashboard_bp = Blueprint('dashboard', __name__)
 KST = pytz.timezone('Asia/Seoul')
 
 # 로컬 서버 URL
-RANK_API_URL = os.environ.get('RANK_API_URL', 'http://localhost:5000')
+RANK_API_URL = os.environ.get('RANK_API_URL', '')
 
 def login_required(f):
     @wraps(f)
