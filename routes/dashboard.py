@@ -5,6 +5,8 @@ import pytz
 import time
 import csv
 import io
+import re
+import requests as http_requests
 
 from utils.db import get_db
 from utils.naver_api import get_naver_rank, get_naver_search_results, get_cached_results, save_cache, update_all_products_with_keyword
@@ -30,6 +32,46 @@ def dashboard_page():
 
 
 # ===== API =====
+
+@dashboard_bp.route('/api/extract-mid', methods=['GET'])
+@login_required
+def extract_mid():
+    """스마트스토어 URL에서 MID(syncNvMid) 추출"""
+    url = request.args.get('url', '').strip()
+    
+    if not url:
+        return jsonify({'success': False, 'error': 'URL을 입력해주세요.'})
+    
+    if 'naver.com' not in url:
+        return jsonify({'success': False, 'error': '네이버 URL이 아닙니다.'})
+    
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': 'https://smartstore.naver.com/',
+        }
+        
+        resp = http_requests.get(url, headers=headers, timeout=10)
+        
+        if resp.status_code != 200:
+            return jsonify({'success': False, 'error': f'페이지 로드 실패: {resp.status_code}'})
+        
+        # syncNvMid 패턴으로 추출 (가장 확실한 방법)
+        match = re.search(r'"syncNvMid"\s*:\s*(\d+)', resp.text)
+        
+        if match:
+            mid = match.group(1)
+            return jsonify({'success': True, 'mid': mid})
+        
+        return jsonify({'success': False, 'error': 'MID를 찾을 수 없습니다. (syncNvMid 패턴 없음)'})
+        
+    except http_requests.Timeout:
+        return jsonify({'success': False, 'error': '요청 시간 초과'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 
 @dashboard_bp.route('/api/products', methods=['GET'])
 @login_required
