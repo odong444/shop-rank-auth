@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body { background: #f5f5f5; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+        .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
         h1 { text-align: center; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
@@ -35,16 +35,60 @@
         .stat-box { background: #f8f9fa; padding: 15px 25px; border-radius: 8px; text-align: center; }
         .stat-box .num { font-size: 24px; font-weight: bold; color: #4a90d9; }
         .stat-box .label { font-size: 12px; color: #666; }
+        
+        /* 등급 배지 */
+        .role-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .role-admin { background: #cce5ff; color: #004085; }
+        .role-customer { background: #d4edda; color: #155724; }
+        .role-normal { background: #e9ecef; color: #495057; }
+        
+        /* 등급 선택 드롭다운 */
+        .role-select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .role-select:focus { outline: none; border-color: #4a90d9; }
+        
+        /* 등급 안내 */
+        .role-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .role-info h4 { margin: 0 0 10px 0; color: #333; }
+        .role-info ul { margin: 0; padding-left: 20px; }
+        .role-info li { margin: 5px 0; color: #666; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="top-btns">
-        <a href="/dashboard" class="back-btn">← 대시보드</a>
-        <a href="/admin/logout" class="logout-btn">로그아웃</a>
+        <a href="/naver-shop" class="back-btn">← 메인으로</a>
+        <a href="/admin/logout" class="logout-btn">관리자 로그아웃</a>
     </div>
     <h1>🔐 관리자 페이지</h1>
     <div class="stats" id="stats"></div>
+    
+    <div class="role-info">
+        <h4>📋 회원 등급 안내</h4>
+        <ul>
+            <li><span class="role-badge role-normal">일반</span> - 기본 가입자 (일 5회 사용)</li>
+            <li><span class="role-badge role-customer">고객</span> - 유료 고객 (일 20회 사용)</li>
+            <li><span class="role-badge role-admin">관리자</span> - 관리자 (무제한 사용)</li>
+        </ul>
+    </div>
+    
     <div class="tabs">
         <button class="tab active" onclick="showTab('users')">👥 회원 관리</button>
         <button class="tab" onclick="showTab('products')">📦 전체 상품</button>
@@ -53,7 +97,7 @@
         <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
         <table>
             <thead>
-                <tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>상품수</th><th>승인</th><th>관리</th></tr>
+                <tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>상품수</th><th>등급</th><th>승인</th><th>관리</th></tr>
             </thead>
             <tbody id="userTable"></tbody>
         </table>
@@ -79,6 +123,21 @@ function showTab(tab) {
     document.querySelector(`.tab-content#tab-${tab}`).classList.add('active');
     event.target.classList.add('active');
     if (tab === 'products') loadAllProducts();
+}
+
+function getRoleBadge(role) {
+    const labels = { admin: '관리자', customer: '고객', normal: '일반' };
+    return `<span class="role-badge role-${role}">${labels[role] || '일반'}</span>`;
+}
+
+function getRoleSelect(userId, currentRole) {
+    return `
+        <select class="role-select" onchange="changeRole('${userId}', this.value)">
+            <option value="normal" ${currentRole === 'normal' ? 'selected' : ''}>일반</option>
+            <option value="customer" ${currentRole === 'customer' ? 'selected' : ''}>고객</option>
+            <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>관리자</option>
+        </select>
+    `;
 }
 
 async function loadStats() {
@@ -114,6 +173,7 @@ async function loadUsers() {
                     <td>${u.phone}</td>
                     <td>${u.regDate}</td>
                     <td>${u.productCount || 0}개</td>
+                    <td>${getRoleSelect(u.userId, u.role || 'normal')}</td>
                     <td style="color:${u.approved === 'Y' ? '#28a745' : '#dc3545'};font-weight:bold">${u.approved === 'Y' ? '승인됨' : '대기중'}</td>
                     <td>
                         ${u.approved === 'Y' 
@@ -157,6 +217,27 @@ async function loadAllProducts() {
         }
     } catch(e) {
         alert('로드 실패');
+    }
+}
+
+async function changeRole(userId, newRole) {
+    try {
+        const r = await fetch('/admin/role', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({userId: userId, role: newRole})
+        });
+        const d = await r.json();
+        if (d.success) {
+            // 성공 시 간단한 피드백
+            console.log(`${userId} 등급 변경: ${newRole}`);
+        } else {
+            alert(d.message || '등급 변경 실패');
+            loadUsers(); // 실패 시 원복
+        }
+    } catch(e) {
+        alert('등급 변경 실패');
+        loadUsers();
     }
 }
 

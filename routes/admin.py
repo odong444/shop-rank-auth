@@ -33,7 +33,7 @@ def get_users():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute('''SELECT u.id, u.user_id, u.name, u.phone, u.reg_date, u.approved,
+        cur.execute('''SELECT u.id, u.user_id, u.name, u.phone, u.reg_date, u.approved, u.role,
                       (SELECT COUNT(*) FROM products p WHERE p.user_id = u.user_id) as product_count
                       FROM users u ORDER BY u.id DESC''')
         rows = cur.fetchall()
@@ -41,7 +41,7 @@ def get_users():
         conn.close()
         return jsonify({
             'success': True, 
-            'users': [{'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3], 'regDate': str(r[4]) if r[4] else '', 'approved': r[5], 'productCount': r[6]} for r in rows]
+            'users': [{'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3], 'regDate': str(r[4]) if r[4] else '', 'approved': r[5], 'role': r[6] or 'normal', 'productCount': r[7]} for r in rows]
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
@@ -114,6 +114,26 @@ def approve_user():
         conn = get_db()
         cur = conn.cursor()
         cur.execute('UPDATE users SET approved=%s WHERE user_id=%s', (d.get('approved', 'Y'), d.get('userId')))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/role', methods=['POST'])
+def change_role():
+    d = request.json
+    user_id = d.get('userId')
+    new_role = d.get('role')
+    
+    if new_role not in ['normal', 'customer', 'admin']:
+        return jsonify({'success': False, 'message': '유효하지 않은 등급입니다.'})
+    
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET role=%s WHERE user_id=%s', (new_role, user_id))
         conn.commit()
         cur.close()
         conn.close()
