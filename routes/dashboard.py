@@ -27,10 +27,16 @@ def login_required(f):
 
 # ===== Pages =====
 
+@dashboard_bp.route('/naver-shop')
+@login_required
+def naver_shop_page():
+    return render_template('dashboard.html', active_menu='naver-shop', rank_api_url=RANK_API_URL)
+
 @dashboard_bp.route('/dashboard')
 @login_required
 def dashboard_page():
-    return render_template('dashboard.html', active_menu='dashboard', rank_api_url=RANK_API_URL)
+    # 기존 URL 호환성 - naver-shop으로 리다이렉트
+    return redirect('/naver-shop')
 
 
 # ===== API =====

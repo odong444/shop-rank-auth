@@ -66,5 +66,12 @@ def init_db():
         except Exception:
             conn.rollback()
     
+    # users 테이블에 role 컬럼 추가
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'normal'")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    
     cur.close()
     conn.close()

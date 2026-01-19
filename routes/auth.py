@@ -52,7 +52,7 @@ def api_login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute('SELECT user_id,password,name,approved FROM users WHERE user_id=%s', (d.get('userId'),))
+        cur.execute('SELECT user_id,password,name,approved,role FROM users WHERE user_id=%s', (d.get('userId'),))
         u = cur.fetchone()
         cur.close()
         conn.close()
@@ -66,6 +66,7 @@ def api_login():
         
         session['user_id'] = d.get('userId')
         session['name'] = u[2]
+        session['role'] = u[4] or 'normal'
         return jsonify({'success': True, 'name': u[2]})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})

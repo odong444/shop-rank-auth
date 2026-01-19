@@ -6,6 +6,7 @@ from utils.db import init_db
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.product_score import product_score_bp
+from routes.brand_sales import brand_sales_bp
 from routes.admin import admin_bp
 
 app = Flask(__name__)
@@ -16,12 +17,13 @@ CORS(app)
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(product_score_bp)
+app.register_blueprint(brand_sales_bp)
 app.register_blueprint(admin_bp)
 
 
 @app.route('/')
 def index():
-    return redirect('/dashboard' if 'user_id' in session else '/login')
+    return redirect('/naver-shop' if 'user_id' in session else '/login')
 
 
 # Initialize database
