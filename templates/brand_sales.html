@@ -36,10 +36,51 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.usage-info {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 10px;
+}
+.usage-info.unlimited {
+    background: #d4edda;
+    color: #155724;
+}
+.usage-info.limited {
+    background: #fff3cd;
+    color: #856404;
+}
+.usage-info.exhausted {
+    background: #f8d7da;
+    color: #721c24;
+}
+.upgrade-notice {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: none;
+    text-align: center;
+}
+.upgrade-notice.show {
+    display: block;
+}
 </style>
 {% endblock %}
 
+{% block header_right %}
+<span id="usageInfo" class="usage-info"></span>
+<span style="font-size:14px;color:#666">👤 {{ session.name }}님</span>
+{% endblock %}
+
 {% block content %}
+<div id="upgradeNotice" class="upgrade-notice">
+    ⚠️ 무료 사용 횟수를 모두 사용했습니다. 계속 사용하시려면 등급 업그레이드가 필요합니다.
+</div>
+
 <div class="card">
     <div class="card-header"><h3>🔍 스토어 매출 조회</h3></div>
     <div class="card-body">
@@ -116,6 +157,50 @@
 {% block extra_js %}
 <script>
 const RANK_API_URL = '{{ rank_api_url }}';
+let canUseService = true;
+
+// 페이지 로드 시 사용량 체크
+async function checkUsage() {
+    try {
+        const r = await fetch('/api/brand-sales/check-usage');
+        const d = await r.json();
+        
+        if (d.success) {
+            updateUsageDisplay(d);
+        }
+    } catch(e) {
+        console.error('사용량 체크 실패:', e);
+    }
+}
+
+function updateUsageDisplay(data) {
+    const usageInfo = document.getElementById('usageInfo');
+    const upgradeNotice = document.getElementById('upgradeNotice');
+    const searchBtn = document.getElementById('searchBtn');
+    
+    if (data.limit === -1) {
+        // 무제한 (고객/관리자)
+        usageInfo.className = 'usage-info unlimited';
+        usageInfo.textContent = '✓ 무제한';
+        canUseService = true;
+        upgradeNotice.classList.remove('show');
+        searchBtn.disabled = false;
+    } else if (data.canUse) {
+        // 사용 가능
+        usageInfo.className = 'usage-info limited';
+        usageInfo.textContent = `남은 횟수: ${data.remaining}/${data.limit}`;
+        canUseService = true;
+        upgradeNotice.classList.remove('show');
+        searchBtn.disabled = false;
+    } else {
+        // 사용 불가
+        usageInfo.className = 'usage-info exhausted';
+        usageInfo.textContent = `사용 완료 (${data.used}/${data.limit})`;
+        canUseService = false;
+        upgradeNotice.classList.add('show');
+        searchBtn.disabled = true;
+    }
+}
 
 async function searchSales() {
     const url = document.getElementById('storeUrl').value.trim();
@@ -129,6 +214,12 @@ async function searchSales() {
     
     if (!url.includes('naver.com')) {
         alert('네이버 스토어 URL을 입력해주세요.\n(brand.naver.com 또는 smartstore.naver.com)');
+        return;
+    }
+    
+    // 사용량 체크
+    if (!canUseService) {
+        alert('무료 사용 횟수를 모두 사용했습니다.\n등급 업그레이드가 필요합니다.');
         return;
     }
     
@@ -151,6 +242,10 @@ async function searchSales() {
         document.getElementById('loading').style.display = 'none';
         
         if (d.success) {
+            // 조회 성공 시 사용량 차감
+            await fetch('/api/brand-sales/use', { method: 'POST' });
+            await checkUsage(); // 사용량 업데이트
+            
             displayResults(d);
         } else {
             document.getElementById('errorArea').style.display = 'block';
@@ -208,5 +303,8 @@ function displayResults(data) {
 document.getElementById('storeUrl').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSales();
 });
+
+// 초기화
+checkUsage();
 </script>
 {% endblock %}

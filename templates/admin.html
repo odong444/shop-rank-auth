@@ -9,14 +9,16 @@
         body { background: #f5f5f5; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
         h1 { text-align: center; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #ddd; }
         th { background: #4a90d9; color: #fff; }
         tr:hover { background: #f9f9f9; }
-        .btn { padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; }
         .btn-approve { background: #28a745; color: #fff; }
         .btn-reject { background: #ffc107; }
         .btn-delete { background: #dc3545; color: #fff; }
+        .btn-reset { background: #6c757d; color: #fff; }
+        .btn-reset-all { background: #17a2b8; color: #fff; padding: 8px 16px; font-size: 13px; }
         .refresh-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #4a90d9; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
         .top-btns { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
         .top-btns a, .top-btns button { padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
@@ -69,6 +71,47 @@
         .role-info h4 { margin: 0 0 10px 0; color: #333; }
         .role-info ul { margin: 0; padding-left: 20px; }
         .role-info li { margin: 5px 0; color: #666; }
+        
+        /* 사용량 표시 */
+        .usage-cell {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        .usage-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 5px;
+        }
+        .usage-label { color: #666; }
+        .usage-value { font-weight: bold; }
+        .usage-warning { color: #dc3545; }
+        .usage-ok { color: #28a745; }
+        
+        /* 관리 버튼 그룹 */
+        .btn-group {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        /* 전체 초기화 섹션 */
+        .reset-section {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .reset-section p {
+            margin: 0;
+            color: #856404;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -83,9 +126,9 @@
     <div class="role-info">
         <h4>📋 회원 등급 안내</h4>
         <ul>
-            <li><span class="role-badge role-normal">일반</span> - 기본 가입자 (일 5회 사용)</li>
-            <li><span class="role-badge role-customer">고객</span> - 유료 고객 (일 20회 사용)</li>
-            <li><span class="role-badge role-admin">관리자</span> - 관리자 (무제한 사용)</li>
+            <li><span class="role-badge role-normal">일반</span> - 순위조회 무제한 / 상품지수 30회 / 매출조회 30회</li>
+            <li><span class="role-badge role-customer">고객</span> - 전체 기능 무제한</li>
+            <li><span class="role-badge role-admin">관리자</span> - 전체 기능 무제한 + 관리 기능</li>
         </ul>
     </div>
     
@@ -93,15 +136,31 @@
         <button class="tab active" onclick="showTab('users')">👥 회원 관리</button>
         <button class="tab" onclick="showTab('products')">📦 전체 상품</button>
     </div>
+    
     <div class="tab-content active" id="tab-users">
+        <div class="reset-section">
+            <p>⚠️ 전체 사용자의 사용량(상품지수/매출조회)을 초기화합니다.</p>
+            <button class="btn btn-reset-all" onclick="resetAllUsage()">🔄 전체 사용량 초기화</button>
+        </div>
         <button class="refresh-btn" onclick="loadUsers()">새로고침</button>
         <table>
             <thead>
-                <tr><th>아이디</th><th>이름</th><th>전화번호</th><th>가입일</th><th>상품수</th><th>등급</th><th>승인</th><th>관리</th></tr>
+                <tr>
+                    <th>아이디</th>
+                    <th>이름</th>
+                    <th>전화번호</th>
+                    <th>가입일</th>
+                    <th>상품수</th>
+                    <th>등급</th>
+                    <th>사용량</th>
+                    <th>승인</th>
+                    <th>관리</th>
+                </tr>
             </thead>
             <tbody id="userTable"></tbody>
         </table>
     </div>
+    
     <div class="tab-content" id="tab-products">
         <div class="search-box">
             <input type="text" id="searchKeyword" placeholder="키워드 또는 스토어명 검색">
@@ -116,7 +175,10 @@
         </table>
     </div>
 </div>
+
 <script>
+const FREE_LIMIT = 30;
+
 function showTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -137,6 +199,30 @@ function getRoleSelect(userId, currentRole) {
             <option value="customer" ${currentRole === 'customer' ? 'selected' : ''}>고객</option>
             <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>관리자</option>
         </select>
+    `;
+}
+
+function getUsageDisplay(role, productScoreUsed, brandSalesUsed) {
+    // 고객/관리자는 무제한
+    if (role === 'customer' || role === 'admin') {
+        return `<span class="usage-ok">무제한</span>`;
+    }
+    
+    // 일반 등급
+    const psClass = productScoreUsed >= FREE_LIMIT ? 'usage-warning' : 'usage-ok';
+    const bsClass = brandSalesUsed >= FREE_LIMIT ? 'usage-warning' : 'usage-ok';
+    
+    return `
+        <div class="usage-cell">
+            <div class="usage-item">
+                <span class="usage-label">상품지수:</span>
+                <span class="usage-value ${psClass}">${productScoreUsed}/${FREE_LIMIT}</span>
+            </div>
+            <div class="usage-item">
+                <span class="usage-label">매출조회:</span>
+                <span class="usage-value ${bsClass}">${brandSalesUsed}/${FREE_LIMIT}</span>
+            </div>
+        </div>
     `;
 }
 
@@ -167,19 +253,24 @@ async function loadUsers() {
             d.users.forEach(u => {
                 select.innerHTML += `<option value="${u.userId}">${u.userId} (${u.name})</option>`;
                 const tr = document.createElement('tr');
+                const role = u.role || 'normal';
                 tr.innerHTML = `
                     <td>${u.userId}</td>
                     <td>${u.name}</td>
                     <td>${u.phone}</td>
                     <td>${u.regDate}</td>
                     <td>${u.productCount || 0}개</td>
-                    <td>${getRoleSelect(u.userId, u.role || 'normal')}</td>
+                    <td>${getRoleSelect(u.userId, role)}</td>
+                    <td>${getUsageDisplay(role, u.productScoreUsed || 0, u.brandSalesUsed || 0)}</td>
                     <td style="color:${u.approved === 'Y' ? '#28a745' : '#dc3545'};font-weight:bold">${u.approved === 'Y' ? '승인됨' : '대기중'}</td>
                     <td>
-                        ${u.approved === 'Y' 
-                            ? `<button class="btn btn-reject" onclick="setApproval('${u.userId}','N')">승인취소</button>` 
-                            : `<button class="btn btn-approve" onclick="setApproval('${u.userId}','Y')">승인</button>`}
-                        <button class="btn btn-delete" onclick="deleteUser('${u.userId}')">삭제</button>
+                        <div class="btn-group">
+                            ${u.approved === 'Y' 
+                                ? `<button class="btn btn-reject" onclick="setApproval('${u.userId}','N')">승인취소</button>` 
+                                : `<button class="btn btn-approve" onclick="setApproval('${u.userId}','Y')">승인</button>`}
+                            <button class="btn btn-reset" onclick="resetUsage('${u.userId}')" title="사용량 초기화">초기화</button>
+                            <button class="btn btn-delete" onclick="deleteUser('${u.userId}')">삭제</button>
+                        </div>
                     </td>`;
                 tbody.appendChild(tr);
             });
@@ -229,15 +320,55 @@ async function changeRole(userId, newRole) {
         });
         const d = await r.json();
         if (d.success) {
-            // 성공 시 간단한 피드백
-            console.log(`${userId} 등급 변경: ${newRole}`);
+            loadUsers(); // 등급 변경 시 사용량 표시도 업데이트
         } else {
             alert(d.message || '등급 변경 실패');
-            loadUsers(); // 실패 시 원복
+            loadUsers();
         }
     } catch(e) {
         alert('등급 변경 실패');
         loadUsers();
+    }
+}
+
+async function resetUsage(userId) {
+    if (!confirm(`${userId} 회원의 사용량을 초기화하시겠습니까?`)) return;
+    
+    try {
+        const r = await fetch('/admin/reset-usage', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({userId: userId})
+        });
+        const d = await r.json();
+        if (d.success) {
+            alert('초기화 완료');
+            loadUsers();
+        } else {
+            alert(d.message || '초기화 실패');
+        }
+    } catch(e) {
+        alert('초기화 실패');
+    }
+}
+
+async function resetAllUsage() {
+    if (!confirm('⚠️ 전체 사용자의 사용량을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+    
+    try {
+        const r = await fetch('/admin/reset-all-usage', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const d = await r.json();
+        if (d.success) {
+            alert('전체 초기화 완료');
+            loadUsers();
+        } else {
+            alert(d.message || '초기화 실패');
+        }
+    } catch(e) {
+        alert('초기화 실패');
     }
 }
 

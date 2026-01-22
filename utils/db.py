@@ -3,8 +3,10 @@ import os
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+
 def get_db():
     return psycopg.connect(DATABASE_URL)
+
 
 def init_db():
     conn = get_db()
@@ -73,5 +75,75 @@ def init_db():
     except Exception:
         conn.rollback()
     
+    # users 테이블에 사용량 컬럼 추가
+    for col in [("product_score_used", "INTEGER DEFAULT 0"), 
+                ("brand_sales_used", "INTEGER DEFAULT 0")]:
+        try:
+            cur.execute(f"ALTER TABLE users ADD COLUMN {col[0]} {col[1]}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    
+    cur.close()
+    conn.close()
+
+
+def get_user_usage(user_id):
+    """사용자의 사용량 및 권한 정보 조회"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''SELECT role, product_score_used, brand_sales_used 
+                   FROM users WHERE user_id = %s''', (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if row:
+        return {
+            'role': row[0] or 'normal',
+            'product_score_used': row[1] or 0,
+            'brand_sales_used': row[2] or 0
+        }
+    return None
+
+
+def increment_usage(user_id, usage_type):
+    """사용량 증가 (usage_type: 'product_score' 또는 'brand_sales')"""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    if usage_type == 'product_score':
+        cur.execute('UPDATE users SET product_score_used = product_score_used + 1 WHERE user_id = %s', (user_id,))
+    elif usage_type == 'brand_sales':
+        cur.execute('UPDATE users SET brand_sales_used = brand_sales_used + 1 WHERE user_id = %s', (user_id,))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def reset_user_usage(user_id, usage_type=None):
+    """사용량 초기화 (usage_type: None이면 전체, 아니면 해당 타입만)"""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    if usage_type == 'product_score':
+        cur.execute('UPDATE users SET product_score_used = 0 WHERE user_id = %s', (user_id,))
+    elif usage_type == 'brand_sales':
+        cur.execute('UPDATE users SET brand_sales_used = 0 WHERE user_id = %s', (user_id,))
+    else:
+        cur.execute('UPDATE users SET product_score_used = 0, brand_sales_used = 0 WHERE user_id = %s', (user_id,))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def reset_all_usage():
+    """전체 사용자 사용량 초기화"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET product_score_used = 0, brand_sales_used = 0')
+    conn.commit()
     cur.close()
     conn.close()
