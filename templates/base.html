@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}순위 관리 시스템{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1>🛒 순위 관리</h1>
+            <p>Rank Tracker</p>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="/naver-shop" class="{% if active_menu == 'naver-shop' %}active{% endif %}">
+                <span class="icon">🛍️</span>네이버 쇼핑 순위체크
+            </a></li>
+            <li><a href="/product-score" class="{% if active_menu == 'product-score' %}active{% endif %}">
+                <span class="icon">📊</span>상품지수 조회
+            </a></li>
+            <li><a href="/brand-sales" class="{% if active_menu == 'brand-sales' %}active{% endif %}">
+                <span class="icon">💰</span>브랜드 매출 조회
+            </a></li>
+            <li><a href="#" style="opacity:.5;cursor:not-allowed">
+                <span class="icon">🚀</span>쿠팡 순위체크<span class="soon">준비중</span>
+            </a></li>
+            <li><a href="#" style="opacity:.5;cursor:not-allowed">
+                <span class="icon">📍</span>네이버 플레이스<span class="soon">준비중</span>
+            </a></li>
+            {% if session.role == 'admin' %}
+            <li><a href="/admin" class="{% if active_menu == 'admin' %}active{% endif %}">
+                <span class="icon">⚙️</span>관리자
+            </a></li>
+            {% endif %}
+        </ul>
+        <div class="sidebar-contact">
+            <p style="color:#888;font-size:12px;margin-bottom:10px;padding:0 15px">📞 문의하기</p>
+            <a href="http://pf.kakao.com/_HcdEn" target="_blank" class="contact-btn">
+                <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">리뷰작업 문의
+            </a>
+            <a href="http://pf.kakao.com/_xkKUnxj" target="_blank" class="contact-btn">
+                <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">네이버 트래픽 문의
+            </a>
+            <a href="http://pf.kakao.com/_xayNxjG" target="_blank" class="contact-btn">
+                <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">쿠팡 트래픽 문의
+            </a>
+            <a href="http://pf.kakao.com/_NxfIxfxj" target="_blank" class="contact-btn">
+                <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_small.png" alt="카카오">체험단 문의
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <a href="/api/logout">🚪 로그아웃</a>
+        </div>
+    </nav>
+    
+    <main class="main">
+        <header class="header">
+            <h2>{% block header_title %}{% endblock %}</h2>
+            <div style="display:flex;align-items:center;gap:15px">
+                {% block header_right %}
+                <span style="font-size:14px;color:#666">👤 {{ session.name }}님</span>
+                {% endblock %}
+            </div>
+        </header>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
