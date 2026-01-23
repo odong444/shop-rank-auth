@@ -148,16 +148,17 @@
     <p class="mt-4 text-sm text-gray">검색 중...</p>
 </div>
 
+<!-- 결과 상단 (개수 + CSV 버튼) -->
+<div id="resultHeader" class="flex items-center justify-between mb-3 hidden">
+    <p id="resultCount" class="text-xs text-gray"></p>
+    <button id="downloadCsvBtn" onclick="downloadCsv()" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;">CSV 다운로드</button>
+</div>
+
 <!-- 결과 영역 -->
 <div id="resultArea">
     <div class="text-center py-8">
         <p class="text-gray text-sm">키워드를 입력하고 검색하세요</p>
     </div>
-</div>
-
-<div class="flex items-center gap-2 mb-3">
-    <p id="resultCount" class="text-xs text-gray"></p>
-    <button id="downloadCsvBtn" onclick="downloadCsv()" class="btn btn-ghost hidden" style="padding: 6px 12px; font-size: 0.75rem;">CSV 다운로드</button>
 </div>
 {% endblock %}
 
@@ -262,12 +263,12 @@ async function searchProducts() {
 
             currentProducts = d.result.products;
             currentKeyword = keyword;
-            resultCount.textContent = `(${d.result.products.length}개)`;
-            document.getElementById('downloadCsvBtn').classList.remove('hidden');
+            resultCount.textContent = `${d.result.products.length}개 결과`;
+            document.getElementById('resultHeader').classList.remove('hidden');
             renderScoreTable(d.result.products);
         } else {
             currentProducts = [];
-            document.getElementById('downloadCsvBtn').classList.add('hidden');
+            document.getElementById('resultHeader').classList.add('hidden');
             resultArea.innerHTML = '<div class="text-center py-16"><div class="text-5xl mb-4">📭</div><p class="text-base-content/60">검색 결과가 없습니다.</p></div>';
         }
     } catch(e) {
