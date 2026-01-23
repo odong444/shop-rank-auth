@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session, redirect, render_template
 
-from utils.db import get_db
+from utils.db import get_db, reset_user_usage, reset_all_usage
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -34,14 +34,20 @@ def get_users():
         conn = get_db()
         cur = conn.cursor()
         cur.execute('''SELECT u.id, u.user_id, u.name, u.phone, u.reg_date, u.approved, u.role,
-                      (SELECT COUNT(*) FROM products p WHERE p.user_id = u.user_id) as product_count
+                      (SELECT COUNT(*) FROM products p WHERE p.user_id = u.user_id) as product_count,
+                      u.product_score_used, u.brand_sales_used
                       FROM users u ORDER BY u.id DESC''')
         rows = cur.fetchall()
         cur.close()
         conn.close()
         return jsonify({
-            'success': True, 
-            'users': [{'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3], 'regDate': str(r[4]) if r[4] else '', 'approved': r[5], 'role': r[6] or 'normal', 'productCount': r[7]} for r in rows]
+            'success': True,
+            'users': [{
+                'id': r[0], 'userId': r[1], 'name': r[2], 'phone': r[3],
+                'regDate': str(r[4]) if r[4] else '', 'approved': r[5],
+                'role': r[6] or 'normal', 'productCount': r[7],
+                'productScoreUsed': r[8] or 0, 'brandSalesUsed': r[9] or 0
+            } for r in rows]
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
@@ -152,6 +158,26 @@ def delete_user():
         conn.commit()
         cur.close()
         conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/reset-usage', methods=['POST'])
+def reset_usage():
+    d = request.json
+    user_id = d.get('userId')
+    if not user_id:
+        return jsonify({'success': False, 'message': '사용자 ID가 필요합니다.'})
+    try:
+        reset_user_usage(user_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/reset-all-usage', methods=['POST'])
+def reset_all_usage_route():
+    try:
+        reset_all_usage()
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
