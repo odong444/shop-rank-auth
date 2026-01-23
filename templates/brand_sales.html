@@ -144,7 +144,10 @@
         </div>
 
         <p id="storeUrlDisplay" class="store-url"></p>
-        <p id="productCount" class="text-xs text-gray mb-3"></p>
+        <div class="flex items-center gap-2 mb-3">
+            <p id="productCount" class="text-xs text-gray"></p>
+            <button id="downloadCsvBtn" onclick="downloadCsv()" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;">CSV 다운로드</button>
+        </div>
 
         <!-- 상품 테이블 -->
         <div style="overflow-x:auto">
@@ -177,6 +180,9 @@
 <script>
 const RANK_API_URL = '{{ rank_api_url }}';
 let canUseService = true;
+let currentProducts = [];
+let currentSummary = {};
+let currentStoreUrl = '';
 
 async function checkUsage() {
     try {
@@ -257,11 +263,14 @@ function displayResults(data) {
     document.getElementById('resultArea').classList.remove('hidden');
 
     const summary = data.summary || {};
+    currentSummary = summary;
+    currentStoreUrl = data.store_url || '';
     document.getElementById('totalAmount').textContent = formatNumber(summary.total_amount || 0) + '원';
     document.getElementById('totalCount').textContent = formatNumber(summary.total_count || 0) + '건';
     document.getElementById('totalClicks').textContent = formatNumber(summary.total_clicks || 0) + '회';
 
     const products = data.products || [];
+    currentProducts = products;
     document.getElementById('productCount').textContent = products.length + '개 상품';
     document.getElementById('storeUrlDisplay').textContent = data.store_url || '';
 
@@ -290,6 +299,43 @@ function displayResults(data) {
 document.getElementById('storeUrl').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSales();
 });
+
+function downloadCsv() {
+    if (currentProducts.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+    }
+
+    const headers = ['순번', '상품명', '매출액', '판매수', '클릭수', '전환율(%)'];
+
+    const rows = currentProducts.map((p, idx) => {
+        const convRate = p.clicks > 0 ? ((p.count / p.clicks) * 100).toFixed(1) : '0.0';
+        return [
+            idx + 1,
+            `"${(p.name || '').replace(/"/g, '""')}"`,
+            p.amount || 0,
+            p.count || 0,
+            p.clicks || 0,
+            convRate
+        ];
+    });
+
+    // 요약 정보 추가
+    rows.push([]);
+    rows.push(['[요약]']);
+    rows.push(['총 매출', currentSummary.total_amount || 0]);
+    rows.push(['총 판매', currentSummary.total_count || 0]);
+    rows.push(['총 클릭', currentSummary.total_clicks || 0]);
+
+    const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `브랜드매출_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
 
 checkUsage();
 </script>

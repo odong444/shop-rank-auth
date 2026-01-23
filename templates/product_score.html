@@ -155,13 +155,18 @@
     </div>
 </div>
 
-<p id="resultCount" class="text-xs text-gray mb-3"></p>
+<div class="flex items-center gap-2 mb-3">
+    <p id="resultCount" class="text-xs text-gray"></p>
+    <button id="downloadCsvBtn" onclick="downloadCsv()" class="btn btn-ghost hidden" style="padding: 6px 12px; font-size: 0.75rem;">CSV 다운로드</button>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 const RANK_API_URL = '{{ rank_api_url }}';
 let canUseService = true;
+let currentProducts = [];
+let currentKeyword = '';
 
 async function checkUsage() {
     try {
@@ -255,9 +260,14 @@ async function searchProducts() {
             await fetch('/api/product-score/use', { method: 'POST' });
             await checkUsage();
 
+            currentProducts = d.result.products;
+            currentKeyword = keyword;
             resultCount.textContent = `(${d.result.products.length}개)`;
+            document.getElementById('downloadCsvBtn').classList.remove('hidden');
             renderScoreTable(d.result.products);
         } else {
+            currentProducts = [];
+            document.getElementById('downloadCsvBtn').classList.add('hidden');
             resultArea.innerHTML = '<div class="text-center py-16"><div class="text-5xl mb-4">📭</div><p class="text-base-content/60">검색 결과가 없습니다.</p></div>';
         }
     } catch(e) {
@@ -320,6 +330,44 @@ function renderScoreTable(products) {
 document.getElementById('searchKeyword').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchProducts();
 });
+
+function downloadCsv() {
+    if (currentProducts.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+    }
+
+    const headers = ['순위', '상품명', '스토어', '가격', '판매처수', '리뷰수', '구매수', '찜수', '신뢰도', '패널티', '종합점수', '적합점수', '인기점수', '클릭점수', '판매점수', '리뷰점수', '최신점수'];
+
+    const rows = currentProducts.map(p => [
+        p.rank || '',
+        `"${(p.productTitle || '').replace(/"/g, '""')}"`,
+        `"${(p.mallName || '').replace(/"/g, '""')}"`,
+        p.lowPrice || 0,
+        p.mallCount || 0,
+        p.reviewCount || 0,
+        p.purchaseCnt || 0,
+        p.keepCnt || 0,
+        p.reliabilityType || '',
+        p.rankDownScoreType || '',
+        p.relevanceStarScore || 0,
+        p.similarityStarScore || 0,
+        p.hitStarScore || 0,
+        p.qualityStarScore || 0,
+        p.saleStarScore || 0,
+        p.reviewCountStarScore || 0,
+        p.recentStarScore || 0
+    ]);
+
+    const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `상품지수_${currentKeyword}_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
 
 checkUsage();
 checkServer();
