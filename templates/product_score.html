@@ -140,7 +140,6 @@
 <div class="search-box">
     <input type="text" id="searchKeyword" placeholder="키워드 입력" class="input">
     <button onclick="searchProducts()" id="searchBtn" class="btn btn-primary">검색</button>
-    <button onclick="showDemoData()" class="btn btn-ghost text-xs">미리보기</button>
 </div>
 
 <!-- 로딩 -->
@@ -321,77 +320,6 @@ function renderScoreTable(products) {
 document.getElementById('searchKeyword').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchProducts();
 });
-
-function showDemoData() {
-    const demoProducts = [
-        {
-            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
-            productTitle: '[베스트셀러] 프리미엄 물티슈 캡형 100매 10팩 - 무향 저자극 아기물티슈',
-            category: '생활용품 > 물티슈',
-            mallName: '깨끗한생활',
-            rank: 1,
-            mallCount: 156,
-            lowPrice: 12900,
-            keepCnt: 8420,
-            reviewCount: 15234,
-            purchaseCnt: 52000,
-            relevanceStarScore: 4.8,
-            similarityStarScore: 4.5,
-            hitStarScore: 4.9,
-            qualityStarScore: 4.2,
-            saleStarScore: 4.7,
-            reviewCountStarScore: 4.6,
-            recentStarScore: 3.8,
-            reliabilityType: 'GOOD',
-            rankDownScoreType: 'GOOD'
-        },
-        {
-            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
-            productTitle: '순수한면 프리미엄 물티슈 72매 캡형 10팩',
-            category: '생활용품 > 물티슈',
-            mallName: '순수몰',
-            rank: 2,
-            mallCount: 89,
-            lowPrice: 9900,
-            keepCnt: 5230,
-            reviewCount: 8921,
-            purchaseCnt: 31000,
-            relevanceStarScore: 4.5,
-            similarityStarScore: 4.3,
-            hitStarScore: 4.6,
-            qualityStarScore: 4.0,
-            saleStarScore: 4.4,
-            reviewCountStarScore: 4.3,
-            recentStarScore: 4.1,
-            reliabilityType: 'GOOD',
-            rankDownScoreType: 'NORMAL'
-        },
-        {
-            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
-            productTitle: '대용량 물티슈 120매 리필형 12팩 가성비 물티슈',
-            category: '생활용품 > 물티슈',
-            mallName: '알뜰마켓',
-            rank: 3,
-            mallCount: 45,
-            lowPrice: 15900,
-            keepCnt: 2100,
-            reviewCount: 3254,
-            purchaseCnt: 12000,
-            relevanceStarScore: 4.2,
-            similarityStarScore: 4.0,
-            hitStarScore: 4.1,
-            qualityStarScore: 3.8,
-            saleStarScore: 4.0,
-            reviewCountStarScore: 3.9,
-            recentStarScore: 4.5,
-            reliabilityType: 'NORMAL',
-            rankDownScoreType: 'BAD'
-        }
-    ];
-
-    document.getElementById('resultCount').textContent = `(${demoProducts.length}개 - 미리보기)`;
-    renderScoreTable(demoProducts);
-}
 
 checkUsage();
 checkServer();

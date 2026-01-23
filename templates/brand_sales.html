@@ -114,7 +114,6 @@
             <option value="monthly">월간</option>
         </select>
         <button onclick="searchSales()" id="searchBtn" class="btn btn-primary">조회</button>
-        <button onclick="showDemoData()" class="btn btn-outline">미리보기</button>
     </div>
     <p class="hint">* 로컬 서버 필요</p>
 </div>
@@ -291,28 +290,6 @@ function displayResults(data) {
 document.getElementById('storeUrl').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSales();
 });
-
-function showDemoData() {
-    const demoData = {
-        success: true,
-        store_url: 'https://brand.naver.com/demo_store',
-        summary: {
-            total_amount: 15840000,
-            total_count: 342,
-            total_clicks: 8920
-        },
-        products: [
-            { name: '[베스트] 프리미엄 물티슈 캡형 100매 10팩', amount: 4250000, count: 85, clicks: 2100 },
-            { name: '순면 아기 물티슈 72매 리필형 20팩', amount: 3120000, count: 78, clicks: 1850 },
-            { name: '대용량 청소용 물티슈 150매 5팩', amount: 2890000, count: 62, clicks: 1420 },
-            { name: '휴대용 미니 물티슈 20매 30개입', amount: 1980000, count: 55, clicks: 1280 },
-            { name: '알로에 보습 물티슈 80매 캡형 8팩', amount: 1650000, count: 38, clicks: 1150 },
-            { name: '주방용 기름때 제거 물티슈 40매 10팩', amount: 1950000, count: 24, clicks: 1120 }
-        ]
-    };
-    displayResults(demoData);
-    document.getElementById('resultCount').textContent = '(미리보기)';
-}
 
 checkUsage();
 </script>
