@@ -66,7 +66,7 @@
         /* 메인 콘텐츠 */
         .app-content {
             padding: 16px;
-            padding-bottom: 80px;
+            padding-bottom: 130px;
         }
 
         /* 하단 탭 네비게이션 */
@@ -110,6 +110,50 @@
 
         .nav-item:hover {
             color: var(--primary-light);
+        }
+
+        /* 문의하기 섹션 */
+        .contact-section {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 640px;
+            background: #fff;
+            border-top: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 99;
+        }
+
+        .contact-label {
+            font-size: 0.688rem;
+            color: var(--text-gray);
+            flex-shrink: 0;
+        }
+
+        .contact-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .contact-links a {
+            font-size: 0.688rem;
+            color: var(--text-gray);
+            text-decoration: none;
+            padding: 4px 10px;
+            background: var(--bg-gray);
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+
+        .contact-links a:hover {
+            background: var(--primary);
+            color: #fff;
         }
 
         /* 카드 스타일 */
@@ -314,6 +358,17 @@
     <main class="app-content">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- 문의하기 -->
+    <div class="contact-section">
+        <span class="contact-label">문의하기</span>
+        <div class="contact-links">
+            <a href="http://pf.kakao.com/_HcdEn" target="_blank">리뷰작업</a>
+            <a href="http://pf.kakao.com/_xkKUnxj" target="_blank">네이버트래픽</a>
+            <a href="http://pf.kakao.com/_xayNxjG" target="_blank">쿠팡트래픽</a>
+            <a href="http://pf.kakao.com/_NxfIxfxj" target="_blank">체험단</a>
+        </div>
+    </div>
 
     <!-- 하단 탭 네비게이션 -->
     <nav class="bottom-nav">
