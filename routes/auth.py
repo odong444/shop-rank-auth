@@ -49,6 +49,14 @@ def register_page():
 @auth_bp.route('/api/login', methods=['POST'])
 def api_login():
     d = request.json
+
+    # 테스트 계정 (하드코딩) - 개발/테스트용
+    if d.get('userId') == 'test' and d.get('password') == 'test':
+        session['user_id'] = 'test'
+        session['name'] = '테스트유저'
+        session['role'] = 'admin'
+        return jsonify({'success': True, 'name': '테스트유저'})
+
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -56,14 +64,14 @@ def api_login():
         u = cur.fetchone()
         cur.close()
         conn.close()
-        
+
         if not u:
             return jsonify({'success': False, 'message': '존재하지 않는 아이디입니다.'})
         if u[1] != d.get('password'):
             return jsonify({'success': False, 'message': '비밀번호가 일치하지 않습니다.'})
         if u[3] != 'Y':
             return jsonify({'success': False, 'message': '관리자 승인 대기 중입니다.\n승인 문의: 카카오톡 odong4444'})
-        
+
         session['user_id'] = d.get('userId')
         session['name'] = u[2]
         session['role'] = u[4] or 'normal'

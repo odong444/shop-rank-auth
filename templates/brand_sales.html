@@ -1,154 +1,174 @@
 {% extends "base.html" %}
 
-{% block title %}브랜드 매출 조회{% endblock %}
-
-{% block header_title %}💰 브랜드 매출 조회{% endblock %}
+{% block title %}브랜드 매출{% endblock %}
 
 {% block extra_css %}
 <style>
-.summary-boxes {
+.search-box {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.search-box .input {
+    flex: 1;
+    min-width: 150px;
+}
+.select {
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    outline: none;
+    background: #fff;
+    min-width: 80px;
+}
+.select:focus {
+    border-color: var(--primary);
+}
+.status-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+    font-size: 0.75rem;
+    color: var(--text-gray);
+}
+.summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
 }
-.summary-box {
-    padding: 20px;
-    border-radius: 12px;
-    color: white;
-    text-align: center;
-}
-.summary-box .label {
-    display: block;
-    font-size: 13px;
-    opacity: 0.9;
-    margin-bottom: 8px;
-}
-.summary-box .value {
-    display: block;
-    font-size: 24px;
-    font-weight: bold;
-}
-.product-name {
-    text-align: left !important;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.usage-info {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-right: 10px;
-}
-.usage-info.unlimited {
-    background: #d4edda;
-    color: #155724;
-}
-.usage-info.limited {
-    background: #fff3cd;
-    color: #856404;
-}
-.usage-info.exhausted {
-    background: #f8d7da;
-    color: #721c24;
-}
-.upgrade-notice {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    padding: 15px 20px;
+.summary-card {
+    background: var(--bg-gray);
     border-radius: 10px;
-    margin-bottom: 20px;
-    display: none;
+    padding: 14px;
     text-align: center;
 }
-.upgrade-notice.show {
-    display: block;
+.summary-card .label {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-bottom: 4px;
+}
+.summary-card .value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+.summary-card.primary {
+    background: rgba(99, 102, 241, 0.1);
+}
+.summary-card.primary .value {
+    color: var(--primary);
+}
+.hint {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+}
+.store-url {
+    font-size: 0.75rem;
+    color: var(--text-gray);
+    margin-bottom: 12px;
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+.data-table th, .data-table td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.data-table th {
+    font-weight: 600;
+    color: var(--text-gray);
+    background: var(--bg-gray);
+}
+.error-box {
+    text-align: center;
+    padding: 48px 16px;
+    color: #EF4444;
 }
 </style>
 {% endblock %}
 
-{% block header_right %}
-<span id="usageInfo" class="usage-info"></span>
-<span style="font-size:14px;color:#666">👤 {{ session.name }}님</span>
-{% endblock %}
-
 {% block content %}
-<div id="upgradeNotice" class="upgrade-notice">
-    ⚠️ 무료 사용 횟수를 모두 사용했습니다. 계속 사용하시려면 등급 업그레이드가 필요합니다.
+<!-- 상태 표시 -->
+<div class="status-bar">
+    <span id="usageInfo"></span>
 </div>
 
+<!-- 업그레이드 알림 -->
+<div id="upgradeNotice" class="alert alert-warning hidden">
+    무료 사용 횟수를 모두 사용했습니다.
+</div>
+
+<!-- 검색 -->
 <div class="card">
-    <div class="card-header"><h3>🔍 스토어 매출 조회</h3></div>
-    <div class="card-body">
-        <div class="search-box" style="margin-bottom:15px">
-            <input type="text" id="storeUrl" placeholder="https://brand.naver.com/스토어명 또는 상품 URL" style="flex:2">
-            <select id="period" style="width:120px;padding:10px;border:1px solid #ddd;border-radius:8px">
-                <option value="daily">일간</option>
-                <option value="weekly">주간</option>
-                <option value="monthly">월간</option>
-            </select>
-            <button onclick="searchSales()" id="searchBtn">조회하기</button>
-        </div>
-        <p style="font-size:12px;color:#888">* 브랜드스토어/스마트스토어 URL 입력 (상품 URL 넣으면 스토어 메인으로 자동 변환)<br>* 윈도우 로컬 서버가 실행 중이어야 합니다</p>
+    <div class="search-box">
+        <input type="text" id="storeUrl" placeholder="스토어 URL 입력" class="input">
+        <select id="period" class="select">
+            <option value="daily">일간</option>
+            <option value="weekly">주간</option>
+            <option value="monthly">월간</option>
+        </select>
+        <button onclick="searchSales()" id="searchBtn" class="btn btn-primary">조회</button>
+        <button onclick="showDemoData()" class="btn btn-outline">미리보기</button>
     </div>
+    <p class="hint">* 로컬 서버 필요</p>
 </div>
 
-<div id="resultArea" style="display:none">
-    <div class="card">
-        <div class="card-header">
-            <h3>📊 매출 결과 <span id="productCount" style="color:#667eea"></span></h3>
-        </div>
-        <div class="card-body">
-            <!-- 매출 요약 -->
-            <div class="summary-boxes" id="summaryBoxes">
-                <div class="summary-box" style="background:linear-gradient(135deg,#667eea,#764ba2)">
-                    <span class="label">💰 총 매출</span>
-                    <span class="value" id="totalAmount">0원</span>
-                </div>
-                <div class="summary-box" style="background:linear-gradient(135deg,#11998e,#38ef7d)">
-                    <span class="label">📦 총 판매</span>
-                    <span class="value" id="totalCount">0건</span>
-                </div>
-                <div class="summary-box" style="background:linear-gradient(135deg,#f093fb,#f5576c)">
-                    <span class="label">👆 총 클릭</span>
-                    <span class="value" id="totalClicks">0회</span>
-                </div>
-            </div>
-            
-            <p id="storeUrlDisplay" style="margin:15px 0;color:#888;font-size:13px"></p>
-            
-            <!-- 상품 테이블 -->
-            <div class="table-scroll">
-                <table class="score-table">
-                    <thead>
-                        <tr>
-                            <th>순위</th>
-                            <th>상품명</th>
-                            <th>매출액</th>
-                            <th>판매수</th>
-                            <th>클릭수</th>
-                            <th>전환율</th>
-                        </tr>
-                    </thead>
-                    <tbody id="salesBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="loading" class="loading" style="display:none">
+<!-- 로딩 -->
+<div id="loading" class="flex flex-col items-center py-8 hidden">
     <div class="spinner"></div>
-    <p>매출 데이터 조회 중...</p>
+    <p class="mt-4 text-sm text-gray">조회 중...</p>
 </div>
 
-<div id="errorArea" style="display:none" class="card">
-    <div class="card-body" style="text-align:center;padding:40px;color:#c00">
-        <div style="font-size:40px;margin-bottom:15px">❌</div>
+<!-- 결과 영역 -->
+<div id="resultArea" class="hidden">
+    <div class="card">
+        <!-- 매출 요약 -->
+        <div class="summary-grid">
+            <div class="summary-card primary">
+                <div class="label">총 매출</div>
+                <div class="value" id="totalAmount">0원</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">총 판매</div>
+                <div class="value" id="totalCount">0건</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">총 클릭</div>
+                <div class="value" id="totalClicks">0회</div>
+            </div>
+        </div>
+
+        <p id="storeUrlDisplay" class="store-url"></p>
+        <p id="productCount" class="text-xs text-gray mb-3"></p>
+
+        <!-- 상품 테이블 -->
+        <div style="overflow-x:auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>상품명</th>
+                        <th>매출액</th>
+                        <th>판매</th>
+                        <th>클릭</th>
+                        <th>전환율</th>
+                    </tr>
+                </thead>
+                <tbody id="salesBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 에러 영역 -->
+<div id="errorArea" class="hidden">
+    <div class="card error-box">
         <p id="errorMsg">오류가 발생했습니다.</p>
     </div>
 </div>
@@ -159,15 +179,11 @@
 const RANK_API_URL = '{{ rank_api_url }}';
 let canUseService = true;
 
-// 페이지 로드 시 사용량 체크
 async function checkUsage() {
     try {
         const r = await fetch('/api/brand-sales/check-usage');
         const d = await r.json();
-        
-        if (d.success) {
-            updateUsageDisplay(d);
-        }
+        if (d.success) updateUsageDisplay(d);
     } catch(e) {
         console.error('사용량 체크 실패:', e);
     }
@@ -177,27 +193,21 @@ function updateUsageDisplay(data) {
     const usageInfo = document.getElementById('usageInfo');
     const upgradeNotice = document.getElementById('upgradeNotice');
     const searchBtn = document.getElementById('searchBtn');
-    
+
     if (data.limit === -1) {
-        // 무제한 (고객/관리자)
-        usageInfo.className = 'usage-info unlimited';
-        usageInfo.textContent = '✓ 무제한';
+        usageInfo.textContent = '무제한';
         canUseService = true;
-        upgradeNotice.classList.remove('show');
+        upgradeNotice.classList.add('hidden');
         searchBtn.disabled = false;
     } else if (data.canUse) {
-        // 사용 가능
-        usageInfo.className = 'usage-info limited';
         usageInfo.textContent = `남은 횟수: ${data.remaining}/${data.limit}`;
         canUseService = true;
-        upgradeNotice.classList.remove('show');
+        upgradeNotice.classList.add('hidden');
         searchBtn.disabled = false;
     } else {
-        // 사용 불가
-        usageInfo.className = 'usage-info exhausted';
         usageInfo.textContent = `사용 완료 (${data.used}/${data.limit})`;
         canUseService = false;
-        upgradeNotice.classList.add('show');
+        upgradeNotice.classList.remove('hidden');
         searchBtn.disabled = true;
     }
 }
@@ -206,105 +216,104 @@ async function searchSales() {
     const url = document.getElementById('storeUrl').value.trim();
     const period = document.getElementById('period').value;
     const btn = document.getElementById('searchBtn');
-    
-    if (!url) {
-        alert('스토어 URL을 입력해주세요.');
-        return;
-    }
-    
-    if (!url.includes('naver.com')) {
-        alert('네이버 스토어 URL을 입력해주세요.\n(brand.naver.com 또는 smartstore.naver.com)');
-        return;
-    }
-    
-    // 사용량 체크
-    if (!canUseService) {
-        alert('무료 사용 횟수를 모두 사용했습니다.\n등급 업그레이드가 필요합니다.');
-        return;
-    }
-    
-    // UI 초기화
-    document.getElementById('resultArea').style.display = 'none';
-    document.getElementById('errorArea').style.display = 'none';
-    document.getElementById('loading').style.display = 'block';
+
+    if (!url) { alert('URL을 입력해주세요.'); return; }
+    if (!url.includes('naver.com')) { alert('네이버 스토어 URL을 입력해주세요.'); return; }
+    if (!canUseService) { alert('사용 횟수를 모두 사용했습니다.'); return; }
+
+    document.getElementById('resultArea').classList.add('hidden');
+    document.getElementById('errorArea').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
     btn.disabled = true;
-    btn.textContent = '조회 중...';
-    
+    btn.textContent = '조회중...';
+
     try {
         const apiUrl = RANK_API_URL + '/api/brand-sales?store_url=' + encodeURIComponent(url) + '&period=' + period;
         const r = await fetch(apiUrl, {
-            method: 'GET',
-            mode: 'cors',
-            headers: {'Accept': 'application/json'}
+            method: 'GET', mode: 'cors', headers: {'Accept': 'application/json'}
         });
         const d = await r.json();
-        
-        document.getElementById('loading').style.display = 'none';
-        
+
+        document.getElementById('loading').classList.add('hidden');
+
         if (d.success) {
-            // 조회 성공 시 사용량 차감
             await fetch('/api/brand-sales/use', { method: 'POST' });
-            await checkUsage(); // 사용량 업데이트
-            
+            await checkUsage();
             displayResults(d);
         } else {
-            document.getElementById('errorArea').style.display = 'block';
-            document.getElementById('errorMsg').textContent = d.error || '조회에 실패했습니다.';
+            document.getElementById('errorArea').classList.remove('hidden');
+            document.getElementById('errorMsg').textContent = d.error || '조회 실패';
         }
     } catch(e) {
-        console.error(e);
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('errorArea').style.display = 'block';
-        document.getElementById('errorMsg').textContent = '로컬 서버 연결 실패\n\n윈도우에서 integrated_server.py가 실행 중인지 확인해주세요.';
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('errorArea').classList.remove('hidden');
+        document.getElementById('errorMsg').textContent = '로컬 서버 연결 실패';
     } finally {
         btn.disabled = false;
-        btn.textContent = '조회하기';
+        btn.textContent = '조회';
     }
 }
 
 function displayResults(data) {
-    document.getElementById('resultArea').style.display = 'block';
-    
-    // 요약 정보
+    document.getElementById('resultArea').classList.remove('hidden');
+
     const summary = data.summary || {};
     document.getElementById('totalAmount').textContent = formatNumber(summary.total_amount || 0) + '원';
     document.getElementById('totalCount').textContent = formatNumber(summary.total_count || 0) + '건';
     document.getElementById('totalClicks').textContent = formatNumber(summary.total_clicks || 0) + '회';
-    
-    // 상품 수
+
     const products = data.products || [];
-    document.getElementById('productCount').textContent = '(' + products.length + '개 상품)';
-    document.getElementById('storeUrlDisplay').innerHTML = '📍 ' + (data.store_url || '');
-    
-    // 테이블 렌더링
+    document.getElementById('productCount').textContent = products.length + '개 상품';
+    document.getElementById('storeUrlDisplay').textContent = data.store_url || '';
+
     const tbody = document.getElementById('salesBody');
     tbody.innerHTML = '';
-    
+
     products.forEach((p, idx) => {
         const tr = document.createElement('tr');
         const convRate = p.clicks > 0 ? ((p.count / p.clicks) * 100).toFixed(1) : '0.0';
         tr.innerHTML = `
             <td>${idx + 1}</td>
-            <td class="product-name" title="${p.name || ''}">${p.name || '-'}</td>
+            <td class="truncate" style="max-width:150px" title="${p.name || ''}">${p.name || '-'}</td>
             <td>${formatNumber(p.amount)}원</td>
-            <td>${formatNumber(p.count)}건</td>
-            <td>${formatNumber(p.clicks)}회</td>
+            <td>${formatNumber(p.count)}</td>
+            <td>${formatNumber(p.clicks)}</td>
             <td>${convRate}%</td>
         `;
         tbody.appendChild(tr);
     });
-    
+
     if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="padding:40px;color:#888">조회된 상품이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-gray);padding:32px">데이터 없음</td></tr>';
     }
 }
 
-// Enter 키로 조회
 document.getElementById('storeUrl').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSales();
 });
 
-// 초기화
+function showDemoData() {
+    const demoData = {
+        success: true,
+        store_url: 'https://brand.naver.com/demo_store',
+        summary: {
+            total_amount: 15840000,
+            total_count: 342,
+            total_clicks: 8920
+        },
+        products: [
+            { name: '[베스트] 프리미엄 물티슈 캡형 100매 10팩', amount: 4250000, count: 85, clicks: 2100 },
+            { name: '순면 아기 물티슈 72매 리필형 20팩', amount: 3120000, count: 78, clicks: 1850 },
+            { name: '대용량 청소용 물티슈 150매 5팩', amount: 2890000, count: 62, clicks: 1420 },
+            { name: '휴대용 미니 물티슈 20매 30개입', amount: 1980000, count: 55, clicks: 1280 },
+            { name: '알로에 보습 물티슈 80매 캡형 8팩', amount: 1650000, count: 38, clicks: 1150 },
+            { name: '주방용 기름때 제거 물티슈 40매 10팩', amount: 1950000, count: 24, clicks: 1120 }
+        ]
+    };
+    displayResults(demoData);
+    document.getElementById('resultCount').textContent = '(미리보기)';
+}
+
 checkUsage();
 </script>
 {% endblock %}

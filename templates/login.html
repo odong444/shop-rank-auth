@@ -2,38 +2,184 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>로그인</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>로그인 - BW RANK</title>
+    <style>
+        :root {
+            --primary: #6366F1;
+            --primary-light: #818CF8;
+            --bg-gray: #F8FAFC;
+            --text-dark: #1E293B;
+            --text-gray: #64748B;
+            --border: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-gray);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .logo p {
+            font-size: 0.875rem;
+            color: var(--text-gray);
+            margin-top: 4px;
+        }
+
+        .error-msg {
+            background: #FEE2E2;
+            color: #991B1B;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--primary);
+        }
+
+        .form-group input::placeholder {
+            color: #94A3B8;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-light);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-gray);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-gray);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+    </style>
 </head>
-<body class="auth-bg">
-<div class="auth-container">
-    <h1>🛒 순위 관리 시스템</h1>
-    <div class="error" id="error"></div>
+<body>
+
+<div class="login-container">
+    <div class="logo">
+        <h1>BW RANK</h1>
+        <p>순위 관리 시스템</p>
+    </div>
+
+    <div id="error" class="error-msg"></div>
+
     <div class="form-group">
         <label>아이디</label>
         <input type="text" id="userId" placeholder="아이디 입력">
     </div>
+
     <div class="form-group">
         <label>비밀번호</label>
         <input type="password" id="password" placeholder="비밀번호 입력">
     </div>
-    <button class="auth-btn auth-btn-primary" onclick="doLogin()">로그인</button>
-    <button class="auth-btn auth-btn-secondary" onclick="location.href='/register'">회원가입</button>
-    <p class="notice">문의: 카카오톡 odong4444</p>
+
+    <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+    <button class="btn btn-ghost" onclick="location.href='/register'">회원가입</button>
+
+    <div class="footer">
+        문의: 카카오톡 odong4444
+    </div>
 </div>
+
 <script>
 async function doLogin() {
     const u = document.getElementById('userId').value;
     const p = document.getElementById('password').value;
     const e = document.getElementById('error');
-    
+
     if (!u || !p) {
         e.textContent = '아이디와 비밀번호를 입력해주세요.';
-        e.style.display = 'block';
+        e.classList.add('show');
         return;
     }
-    
+
     try {
         const r = await fetch('/api/login', {
             method: 'POST',
@@ -45,11 +191,11 @@ async function doLogin() {
             location.href = '/dashboard';
         } else {
             e.textContent = d.message;
-            e.style.display = 'block';
+            e.classList.add('show');
         }
     } catch(x) {
         e.textContent = '서버 연결 실패';
-        e.style.display = 'block';
+        e.classList.add('show');
     }
 }
 

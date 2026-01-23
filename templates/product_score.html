@@ -1,84 +1,162 @@
 {% extends "base.html" %}
 
 {% block title %}상품지수 조회{% endblock %}
-{% block header_title %}📊 상품지수 조회{% endblock %}
-
-{% block header_right %}
-<span id="usageInfo" class="usage-info"></span>
-<span id="serverStatus" class="server-status offline">● 서버 확인중</span>
-<span style="font-size:14px;color:#666">👤 {{ session.name }}님</span>
-{% endblock %}
 
 {% block extra_css %}
 <style>
-.usage-info {
-    display: inline-block;
-    padding: 4px 12px;
+.product-card {
+    background: #fff;
+    border: 1px solid var(--border);
     border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-right: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
 }
-.usage-info.unlimited {
-    background: #d4edda;
-    color: #155724;
+.product-header {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
 }
-.usage-info.limited {
-    background: #fff3cd;
-    color: #856404;
+.product-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
 }
-.usage-info.exhausted {
-    background: #f8d7da;
-    color: #721c24;
+.product-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
-.upgrade-notice {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    padding: 15px 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    display: none;
-    text-align: center;
+.product-badges {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    line-height: 1;
 }
-.upgrade-notice.show {
-    display: block;
+.product-title {
+    font-size: 0.813rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 2px;
+}
+.product-meta {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.stat-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+.stat-mini span:first-child {
+    font-size: 0.563rem;
+    color: var(--text-gray);
+}
+.stat-mini span:last-child {
+    font-size: 0.688rem;
+    font-weight: 600;
+}
+.score-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+.score-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 2px;
+    background: var(--bg-gray);
+    border-radius: 4px;
+    gap: 1px;
+}
+.score-box span:first-child {
+    color: var(--text-gray);
+    font-size: 0.563rem;
+}
+.score-box span:last-child {
+    font-weight: 600;
+    font-size: 0.688rem;
+}
+.score-box.score-primary {
+    background: rgba(99, 102, 241, 0.1);
+}
+.score-box.score-primary span:last-child {
+    color: var(--primary);
+}
+.score-box.score-yellow {
+    background: rgba(245, 158, 11, 0.1);
+}
+.score-box.score-yellow span:last-child {
+    color: #F59E0B;
+}
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.75rem;
+    color: var(--text-gray);
+}
+.search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.search-box .input {
+    flex: 1;
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="upgradeNotice" class="upgrade-notice">
-    ⚠️ 무료 사용 횟수를 모두 사용했습니다. 계속 사용하시려면 등급 업그레이드가 필요합니다.
+<!-- 상태 표시 -->
+<div class="status-bar">
+    <span id="usageInfo"></span>
+    <span id="serverStatus">서버 확인중</span>
 </div>
 
-<div class="card">
-    <div class="card-header"><h3>🔍 키워드 검색</h3></div>
-    <div class="card-body">
-        <div class="search-box">
-            <input type="text" id="searchKeyword" placeholder="검색할 키워드를 입력하세요 (예: 물티슈)">
-            <button onclick="searchProducts()" id="searchBtn">검색</button>
-        </div>
-        <p style="margin-top:10px;font-size:12px;color:#888">* 윈도우 로컬 서버가 실행 중이어야 합니다</p>
+<!-- 업그레이드 알림 -->
+<div id="upgradeNotice" class="alert alert-warning hidden">
+    무료 사용 횟수를 모두 사용했습니다.
+</div>
+
+<!-- 검색 -->
+<div class="search-box">
+    <input type="text" id="searchKeyword" placeholder="키워드 입력" class="input">
+    <button onclick="searchProducts()" id="searchBtn" class="btn btn-primary">검색</button>
+    <button onclick="showDemoData()" class="btn btn-ghost text-xs">미리보기</button>
+</div>
+
+<!-- 로딩 -->
+<div id="loading" class="flex flex-col items-center py-8 hidden">
+    <div class="spinner"></div>
+    <p class="mt-4 text-sm text-gray">검색 중...</p>
+</div>
+
+<!-- 결과 영역 -->
+<div id="resultArea">
+    <div class="text-center py-8">
+        <p class="text-gray text-sm">키워드를 입력하고 검색하세요</p>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h3>📋 검색 결과 <span id="resultCount" style="color:#667eea"></span></h3>
-    </div>
-    <div class="card-body">
-        <div id="loading" class="loading" style="display:none">
-            <div class="spinner"></div>
-            <p>검색 중...</p>
-        </div>
-        <div id="resultArea">
-            <div class="empty">
-                <div class="empty-icon">🔍</div>
-                <p>키워드를 입력하고 검색하세요.<br>상품별 상세 점수를 확인할 수 있습니다.</p>
-            </div>
-        </div>
-    </div>
-</div>
+<p id="resultCount" class="text-xs text-gray mb-3"></p>
 {% endblock %}
 
 {% block extra_js %}
@@ -86,12 +164,11 @@
 const RANK_API_URL = '{{ rank_api_url }}';
 let canUseService = true;
 
-// 페이지 로드 시 사용량 체크
 async function checkUsage() {
     try {
         const r = await fetch('/api/product-score/check-usage');
         const d = await r.json();
-        
+
         if (d.success) {
             updateUsageDisplay(d);
         }
@@ -104,27 +181,21 @@ function updateUsageDisplay(data) {
     const usageInfo = document.getElementById('usageInfo');
     const upgradeNotice = document.getElementById('upgradeNotice');
     const searchBtn = document.getElementById('searchBtn');
-    
+
     if (data.limit === -1) {
-        // 무제한 (고객/관리자)
-        usageInfo.className = 'usage-info unlimited';
-        usageInfo.textContent = '✓ 무제한';
+        usageInfo.textContent = '무제한';
         canUseService = true;
-        upgradeNotice.classList.remove('show');
+        upgradeNotice.classList.add('hidden');
         searchBtn.disabled = false;
     } else if (data.canUse) {
-        // 사용 가능
-        usageInfo.className = 'usage-info limited';
         usageInfo.textContent = `남은 횟수: ${data.remaining}/${data.limit}`;
         canUseService = true;
-        upgradeNotice.classList.remove('show');
+        upgradeNotice.classList.add('hidden');
         searchBtn.disabled = false;
     } else {
-        // 사용 불가
-        usageInfo.className = 'usage-info exhausted';
         usageInfo.textContent = `사용 완료 (${data.used}/${data.limit})`;
         canUseService = false;
-        upgradeNotice.classList.add('show');
+        upgradeNotice.classList.remove('hidden');
         searchBtn.disabled = true;
     }
 }
@@ -134,13 +205,13 @@ async function checkServer() {
     try {
         const r = await fetch(RANK_API_URL + '/health', {method: 'GET', mode: 'cors'});
         if (r.ok) {
-            status.className = 'server-status online';
-            status.textContent = '● 서버 연결됨';
+            status.textContent = '서버 연결됨';
+            status.style.color = 'oklch(var(--su))';
             return true;
         }
     } catch(e) {}
-    status.className = 'server-status offline';
-    status.textContent = '● 서버 오프라인';
+    status.textContent = '서버 오프라인';
+    status.style.color = 'oklch(var(--er))';
     return false;
 }
 
@@ -150,30 +221,29 @@ async function searchProducts() {
     const loading = document.getElementById('loading');
     const resultArea = document.getElementById('resultArea');
     const resultCount = document.getElementById('resultCount');
-    
+
     if (!keyword) {
         alert('검색 키워드를 입력해주세요.');
         return;
     }
-    
-    // 사용량 체크
+
     if (!canUseService) {
         alert('무료 사용 횟수를 모두 사용했습니다.\n등급 업그레이드가 필요합니다.');
         return;
     }
-    
+
     const serverOk = await checkServer();
     if (!serverOk) {
         alert('로컬 서버에 연결할 수 없습니다.\n윈도우 서버가 실행 중인지 확인해주세요.');
         return;
     }
-    
+
     btn.disabled = true;
-    btn.textContent = '검색 중...';
-    loading.style.display = 'block';
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span>';
+    loading.classList.remove('hidden');
     resultArea.innerHTML = '';
     resultCount.textContent = '';
-    
+
     try {
         const r = await fetch(RANK_API_URL + '/api/product-score?keyword=' + encodeURIComponent(keyword), {
             method: 'GET',
@@ -181,79 +251,70 @@ async function searchProducts() {
             headers: {'Accept': 'application/json'}
         });
         const d = await r.json();
-        
+
         if (d.result && d.result.products && d.result.products.length > 0) {
-            // 검색 성공 시 사용량 차감
             await fetch('/api/product-score/use', { method: 'POST' });
-            await checkUsage(); // 사용량 업데이트
-            
+            await checkUsage();
+
             resultCount.textContent = `(${d.result.products.length}개)`;
             renderScoreTable(d.result.products);
         } else {
-            resultArea.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>검색 결과가 없습니다.</p></div>';
+            resultArea.innerHTML = '<div class="text-center py-16"><div class="text-5xl mb-4">📭</div><p class="text-base-content/60">검색 결과가 없습니다.</p></div>';
         }
     } catch(e) {
         console.error(e);
-        resultArea.innerHTML = '<div class="empty" style="color:#c00"><div class="empty-icon">⚠️</div><p>검색 중 오류가 발생했습니다.<br>서버 연결을 확인해주세요.</p></div>';
+        resultArea.innerHTML = '<div class="text-center py-16 text-error"><div class="text-5xl mb-4">⚠️</div><p>검색 중 오류가 발생했습니다.<br>서버 연결을 확인해주세요.</p></div>';
     } finally {
         btn.disabled = false;
         btn.textContent = '검색';
-        loading.style.display = 'none';
+        loading.classList.add('hidden');
     }
 }
 
 function renderScoreTable(products) {
     const resultArea = document.getElementById('resultArea');
-    
-    let html = `<div class="table-scroll"><table class="score-table">
-    <thead><tr>
-        <th rowspan="2">이미지</th>
-        <th rowspan="2">순위</th>
-        <th rowspan="2">판매처수</th>
-        <th rowspan="2">가격</th>
-        <th rowspan="2">찜수</th>
-        <th rowspan="2">리뷰수</th>
-        <th rowspan="2">구매건수</th>
-        <th class="score-red">종합점수</th>
-        <th>적합도</th>
-        <th class="score-yellow">인기도</th>
-        <th>클릭점수</th>
-        <th>판매점수</th>
-        <th>리뷰점수</th>
-        <th>최신성</th>
-        <th>신뢰성</th>
-        <th>패널티등급</th>
-    </tr></thead><tbody>`;
-    
+
+    let html = '';
+
     products.forEach(p => {
-        html += `<tr class="product-row">
-            <td rowspan="2" class="img-cell"><img src="${p.imageUrl || ''}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect fill=%22%23eee%22 width=%2250%22 height=%2250%22/><text x=%2225%22 y=%2230%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2210%22>No IMG</text></svg>'"></td>
-            <td colspan="15" style="text-align:left;padding:10px">
-                <div><strong>상품명:</strong> <span class="product-title" title="${p.productTitle || ''}">${p.productTitle || '-'}</span></div>
-                <div style="margin-top:3px"><strong>카테고리:</strong> ${p.category || '-'} &nbsp;&nbsp; <strong>판매처명:</strong> ${p.mallName || '-'}</div>
-            </td>
-        </tr>`;
-        
-        html += `<tr class="data-row">
-            <td>${p.rank || '-'}</td>
-            <td>${p.mallCount || 0}</td>
-            <td>${formatNumber(p.lowPrice)}</td>
-            <td>${formatNumber(p.keepCnt)}</td>
-            <td>${formatNumber(p.reviewCount)}</td>
-            <td>${formatNumber(p.purchaseCnt)}</td>
-            <td class="score-red">${p.relevanceStarScore || 0}</td>
-            <td>${p.similarityStarScore || 0}</td>
-            <td class="score-yellow">${p.hitStarScore || 0}</td>
-            <td>${p.qualityStarScore || 0}</td>
-            <td>${p.saleStarScore || 0}</td>
-            <td>${p.reviewCountStarScore || 0}</td>
-            <td>${p.recentStarScore || 0}</td>
-            <td class="${p.reliabilityType === 'GOOD' ? 'score-good' : ''}">${p.reliabilityType || '-'}</td>
-            <td class="${p.rankDownScoreType === 'GOOD' ? 'score-good' : (p.rankDownScoreType === 'BAD' ? 'score-bad' : '')}">${p.rankDownScoreType || '-'}</td>
-        </tr>`;
+        const reliabilityClass = p.reliabilityType === 'GOOD' ? 'badge-success' : 'badge-gray';
+        const penaltyClass = p.rankDownScoreType === 'GOOD' ? 'badge-success' : (p.rankDownScoreType === 'BAD' ? 'badge-error' : 'badge-gray');
+
+        html += `
+        <div class="product-card">
+            <div class="product-header">
+                <img src="${p.imageUrl || ''}" class="product-img" onerror="this.style.display='none'">
+                <div class="product-info">
+                    <div class="product-badges">
+                        <span class="badge badge-primary">${p.rank || '-'}위</span>
+                        <span class="badge ${reliabilityClass}">${p.reliabilityType || '-'}</span>
+                        <span class="badge ${penaltyClass}">${p.rankDownScoreType || '-'}</span>
+                    </div>
+                    <p class="product-title">${p.productTitle || '-'}</p>
+                    <p class="product-meta">${p.mallName || '-'}</p>
+                </div>
+            </div>
+
+            <div class="stat-row">
+                <div class="stat-mini"><span>가격</span><span>${formatNumber(p.lowPrice)}원</span></div>
+                <div class="stat-mini"><span>판매처</span><span>${p.mallCount || 0}</span></div>
+                <div class="stat-mini"><span>리뷰</span><span>${formatNumber(p.reviewCount)}</span></div>
+                <div class="stat-mini"><span>구매</span><span>${formatNumber(p.purchaseCnt)}</span></div>
+            </div>
+
+            <div class="score-row">
+                <div class="score-box score-primary"><span>종합</span><span>${p.relevanceStarScore || 0}</span></div>
+                <div class="score-box"><span>적합</span><span>${p.similarityStarScore || 0}</span></div>
+                <div class="score-box score-yellow"><span>인기</span><span>${p.hitStarScore || 0}</span></div>
+                <div class="score-box"><span>클릭</span><span>${p.qualityStarScore || 0}</span></div>
+                <div class="score-box"><span>판매</span><span>${p.saleStarScore || 0}</span></div>
+                <div class="score-box"><span>리뷰</span><span>${p.reviewCountStarScore || 0}</span></div>
+                <div class="score-box"><span>최신</span><span>${p.recentStarScore || 0}</span></div>
+                <div class="score-box"><span>찜</span><span>${formatNumber(p.keepCnt)}</span></div>
+            </div>
+        </div>`;
     });
-    
-    html += '</tbody></table></div>';
+
     resultArea.innerHTML = html;
 }
 
@@ -261,7 +322,77 @@ document.getElementById('searchKeyword').addEventListener('keypress', function(e
     if (e.key === 'Enter') searchProducts();
 });
 
-// 초기화
+function showDemoData() {
+    const demoProducts = [
+        {
+            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
+            productTitle: '[베스트셀러] 프리미엄 물티슈 캡형 100매 10팩 - 무향 저자극 아기물티슈',
+            category: '생활용품 > 물티슈',
+            mallName: '깨끗한생활',
+            rank: 1,
+            mallCount: 156,
+            lowPrice: 12900,
+            keepCnt: 8420,
+            reviewCount: 15234,
+            purchaseCnt: 52000,
+            relevanceStarScore: 4.8,
+            similarityStarScore: 4.5,
+            hitStarScore: 4.9,
+            qualityStarScore: 4.2,
+            saleStarScore: 4.7,
+            reviewCountStarScore: 4.6,
+            recentStarScore: 3.8,
+            reliabilityType: 'GOOD',
+            rankDownScoreType: 'GOOD'
+        },
+        {
+            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
+            productTitle: '순수한면 프리미엄 물티슈 72매 캡형 10팩',
+            category: '생활용품 > 물티슈',
+            mallName: '순수몰',
+            rank: 2,
+            mallCount: 89,
+            lowPrice: 9900,
+            keepCnt: 5230,
+            reviewCount: 8921,
+            purchaseCnt: 31000,
+            relevanceStarScore: 4.5,
+            similarityStarScore: 4.3,
+            hitStarScore: 4.6,
+            qualityStarScore: 4.0,
+            saleStarScore: 4.4,
+            reviewCountStarScore: 4.3,
+            recentStarScore: 4.1,
+            reliabilityType: 'GOOD',
+            rankDownScoreType: 'NORMAL'
+        },
+        {
+            imageUrl: 'https://shopping-phinf.pstatic.net/main_8232123/82321232112.jpg',
+            productTitle: '대용량 물티슈 120매 리필형 12팩 가성비 물티슈',
+            category: '생활용품 > 물티슈',
+            mallName: '알뜰마켓',
+            rank: 3,
+            mallCount: 45,
+            lowPrice: 15900,
+            keepCnt: 2100,
+            reviewCount: 3254,
+            purchaseCnt: 12000,
+            relevanceStarScore: 4.2,
+            similarityStarScore: 4.0,
+            hitStarScore: 4.1,
+            qualityStarScore: 3.8,
+            saleStarScore: 4.0,
+            reviewCountStarScore: 3.9,
+            recentStarScore: 4.5,
+            reliabilityType: 'NORMAL',
+            rankDownScoreType: 'BAD'
+        }
+    ];
+
+    document.getElementById('resultCount').textContent = `(${demoProducts.length}개 - 미리보기)`;
+    renderScoreTable(demoProducts);
+}
+
 checkUsage();
 checkServer();
 setInterval(checkServer, 30000);

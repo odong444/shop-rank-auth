@@ -1,88 +1,269 @@
 {% extends "base.html" %}
 
-{% block title %}대시보드{% endblock %}
-{% block header_title %}🛍️ 네이버 쇼핑 순위체크{% endblock %}
+{% block title %}쇼핑순위{% endblock %}
+
+{% block extra_css %}
+<style>
+.section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-dark);
+}
+.input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.input-row .input {
+    flex: 1;
+}
+.divider {
+    border-bottom: 1px dashed var(--border);
+    margin: 12px 0;
+}
+.file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.file-input {
+    flex: 1;
+    min-width: 150px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+.btn-sm {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+}
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-gray);
+}
+.btn-outline:hover {
+    background: var(--bg-gray);
+}
+.btn-danger {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+.btn-danger:hover {
+    background: #FECACA;
+}
+.selected-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #FEF3C7;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.813rem;
+}
+.action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.action-btns {
+    display: flex;
+    gap: 8px;
+}
+.table-wrap {
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px;
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    min-width: 600px;
+}
+.data-table th, .data-table td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.data-table th {
+    font-weight: 600;
+    color: var(--text-gray);
+    background: var(--bg-gray);
+    position: sticky;
+    top: 0;
+}
+.data-table tr:hover {
+    background: var(--bg-gray);
+}
+.rank-up {
+    color: #10B981;
+    font-weight: 600;
+}
+.rank-down {
+    color: #EF4444;
+    font-weight: 600;
+}
+.action-cell {
+    display: flex;
+    gap: 4px;
+}
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.625rem;
+    border-radius: 4px;
+}
+.empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text-gray);
+}
+.checkbox-cell {
+    width: 32px;
+}
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+}
+.hint {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-top: 8px;
+}
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.modal-overlay.hidden {
+    display: none;
+}
+.modal-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-gray);
+}
+</style>
+{% endblock %}
 
 {% block content %}
+<!-- 상품 등록 -->
 <div class="card">
-    <div class="card-header"><h3>➕ 상품 등록</h3></div>
-    <div class="card-body">
-        <!-- 스마트스토어 링크로 MID 추출 -->
-        <div class="form-row" style="margin-bottom:15px;padding-bottom:15px;border-bottom:1px dashed #ddd">
-            <input type="text" id="smartstoreUrl" placeholder="🔗 스마트스토어 링크 붙여넣기 (예: https://smartstore.naver.com/store/products/123456)" style="flex:2">
-            <button onclick="extractMid()" id="extractBtn" style="background:#03c75a;color:#fff">MID 추출</button>
-        </div>
-        
-        <div class="form-row" style="margin-bottom:15px">
-            <input type="text" id="mid" placeholder="MID (상품번호)">
-            <input type="text" id="keyword" placeholder="검색 키워드">
-            <button onclick="addProduct()" id="addBtn">등록하기</button>
-        </div>
-        <div class="form-row">
-            <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="padding:8px">
-            <button onclick="bulkUpload()" id="bulkBtn" style="background:#FF9800;color:#fff">📁 대량등록</button>
-            <button onclick="downloadSample()" style="background:#6c757d;color:#fff">📥 샘플파일</button>
-        </div>
-        <p style="margin-top:10px;font-size:12px;color:#888">* MID 추출은 로컬 서버가 실행 중이어야 합니다</p>
+    <div class="section-title">상품 등록</div>
+
+    <div class="input-row">
+        <input type="text" id="smartstoreUrl" placeholder="스마트스토어 링크" class="input">
+        <button onclick="extractMid()" id="extractBtn" class="btn btn-outline btn-sm">MID 추출</button>
     </div>
+
+    <div class="divider"></div>
+
+    <div class="input-row">
+        <input type="text" id="mid" placeholder="MID" class="input">
+        <input type="text" id="keyword" placeholder="키워드" class="input">
+        <button onclick="addProduct()" id="addBtn" class="btn btn-primary btn-sm">등록</button>
+    </div>
+
+    <div class="file-row">
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" class="file-input">
+        <button onclick="bulkUpload()" id="bulkBtn" class="btn btn-outline btn-sm">대량등록</button>
+        <button onclick="downloadSample()" class="btn btn-outline btn-sm">샘플</button>
+    </div>
+
+    <p class="hint">* MID 추출은 로컬 서버 필요</p>
 </div>
 
-<div class="selected-info" id="selectedInfo">
-    <span><strong id="selectedCount">0</strong>개 선택됨</span>
-    <button class="btn btn-danger" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+<!-- 선택 정보 -->
+<div id="selectedInfo" class="selected-bar hidden">
+    <span><strong id="selectedCount">0</strong>개 선택</span>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelected()">선택 삭제</button>
 </div>
 
+<!-- 상품 목록 -->
 <div class="card">
-    <div class="card-header">
-        <h3>📋 내 상품 목록 <span id="productCount" style="color:#667eea"></span></h3>
-        <div class="btn-group">
-            <button class="btn btn-success" onclick="exportExcel()">📥 엑셀 다운로드</button>
-            <button class="btn btn-primary" onclick="refreshAll()" id="refreshBtn">🔄 전체 새로고침</button>
+    <div class="action-row">
+        <div class="section-title" style="margin:0">상품 목록 <span id="productCount" style="color:var(--primary)"></span></div>
+        <div class="action-btns">
+            <button class="btn btn-outline btn-sm" onclick="exportExcel()">엑셀</button>
+            <button class="btn btn-primary btn-sm" onclick="refreshAll()" id="refreshBtn">새로고침</button>
         </div>
     </div>
-    <div class="card-body">
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>로딩 중...</p>
-        </div>
-        <div class="table-container" id="tableContainer" style="display:none">
-            <table>
-                <thead>
-                    <tr>
-                        <th class="checkbox-col"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                        <th>스토어명</th>
-                        <th>상품명</th>
-                        <th>MID</th>
-                        <th>키워드</th>
-                        <th>최초순위</th>
-                        <th>이전순위</th>
-                        <th>오늘순위</th>
-                        <th>관리</th>
-                    </tr>
-                </thead>
-                <tbody id="productBody"></tbody>
-            </table>
-        </div>
-        <div id="empty" class="empty" style="display:none">
-            <div class="empty-icon">📦</div>
-            <p>등록된 상품이 없습니다.<br>상품을 등록해보세요!</p>
-        </div>
+
+    <!-- 로딩 -->
+    <div id="loading" class="flex flex-col items-center py-8">
+        <div class="spinner"></div>
+        <p class="mt-4 text-sm text-gray">로딩 중...</p>
+    </div>
+
+    <!-- 테이블 -->
+    <div id="tableContainer" class="table-wrap hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                    <th>스토어</th>
+                    <th>상품명</th>
+                    <th>키워드</th>
+                    <th>최초</th>
+                    <th>이전</th>
+                    <th>현재</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="productBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 빈 상태 -->
+    <div id="empty" class="empty-state hidden">
+        <p>등록된 상품이 없습니다</p>
     </div>
 </div>
 
-<div class="modal" id="historyModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>📊 순위 변동 이력</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <p id="historyTitle" style="margin-bottom:15px;color:#666"></p>
-        <div class="table-container">
-            <table>
-                <thead><tr><th>날짜/시간</th><th>순위</th></tr></thead>
-                <tbody id="historyBody"></tbody>
-            </table>
-        </div>
+<!-- 이력 모달 -->
+<div id="historyModal" class="modal-overlay hidden" onclick="closeHistoryModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-title">순위 변동 이력</div>
+        <p id="historyTitle" class="text-sm text-gray mb-3"></p>
+        <table class="data-table">
+            <thead><tr><th>날짜/시간</th><th>순위</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+        <button class="btn btn-outline w-full mt-4" onclick="closeHistoryModal()">닫기</button>
     </div>
 </div>
 {% endblock %}
@@ -92,54 +273,40 @@
 let products = [];
 let selectedIds = new Set();
 
-// 로컬 서버 URL (상품지수 조회와 동일)
 const RANK_API_URL = '{{ rank_api_url }}';
 
-// 스마트스토어 링크에서 MID 추출 (로컬 서버 사용)
 async function extractMid() {
     const url = document.getElementById('smartstoreUrl').value.trim();
     const btn = document.getElementById('extractBtn');
-    
-    if (!url) {
-        alert('스마트스토어 링크를 입력해주세요.');
-        return;
-    }
-    
-    if (!url.includes('naver.com')) {
-        alert('네이버 스마트스토어 링크를 입력해주세요.');
-        return;
-    }
-    
+
+    if (!url) { alert('링크를 입력해주세요.'); return; }
+    if (!url.includes('naver.com')) { alert('네이버 링크를 입력해주세요.'); return; }
+
     btn.disabled = true;
-    btn.textContent = '추출 중...';
-    
+    btn.textContent = '추출중...';
+
     try {
-        // 로컬 서버의 extract-mid API 호출
         const r = await fetch(RANK_API_URL + '/api/extract-mid?url=' + encodeURIComponent(url), {
-            method: 'GET',
-            mode: 'cors',
-            headers: {'Accept': 'application/json'}
+            method: 'GET', mode: 'cors', headers: {'Accept': 'application/json'}
         });
         const d = await r.json();
-        
+
         if (d.success) {
             document.getElementById('mid').value = d.mid;
             document.getElementById('smartstoreUrl').value = '';
             document.getElementById('keyword').focus();
-            alert('✅ MID 추출 완료: ' + d.mid + '\n\n키워드를 입력하고 등록하기를 눌러주세요.');
+            alert('MID 추출 완료: ' + d.mid);
         } else {
-            alert('❌ 추출 실패: ' + d.error);
+            alert('추출 실패: ' + d.error);
         }
     } catch(e) {
-        console.error(e);
-        alert('❌ 로컬 서버 연결 실패\n\n윈도우에서 integrated_server.py가 실행 중인지 확인해주세요.');
+        alert('로컬 서버 연결 실패');
     } finally {
         btn.disabled = false;
         btn.textContent = 'MID 추출';
     }
 }
 
-// Enter 키로 MID 추출
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('smartstoreUrl').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') extractMid();
@@ -150,12 +317,12 @@ async function loadProducts() {
     try {
         const r = await fetch('/api/products');
         const d = await r.json();
-        document.getElementById('loading').style.display = 'none';
-        
+        document.getElementById('loading').classList.add('hidden');
+
         if (d.success && d.products.length > 0) {
             products = d.products;
-            document.getElementById('tableContainer').style.display = 'block';
-            document.getElementById('empty').style.display = 'none';
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('empty').classList.add('hidden');
             document.getElementById('productCount').textContent = `(${d.products.length}개)`;
             selectedIds.clear();
             updateSelectedInfo();
@@ -163,57 +330,56 @@ async function loadProducts() {
             checkPendingRanks();
         } else {
             products = [];
-            document.getElementById('tableContainer').style.display = 'none';
-            document.getElementById('empty').style.display = 'block';
+            document.getElementById('tableContainer').classList.add('hidden');
+            document.getElementById('empty').classList.remove('hidden');
             document.getElementById('productCount').textContent = '(0개)';
         }
     } catch(e) {
-        document.getElementById('loading').innerHTML = '<p style="color:#c00">데이터 로드 실패</p>';
+        document.getElementById('loading').innerHTML = '<p style="color:#EF4444">로드 실패</p>';
     }
 }
 
 function renderTable() {
     const tbody = document.getElementById('productBody');
     tbody.innerHTML = '';
-    
+
     products.forEach(p => {
         const tr = document.createElement('tr');
         tr.id = 'row-' + p.id;
         const isChecked = selectedIds.has(p.id) ? 'checked' : '';
-        
-        let todayHtml = p.current_rank === '-' || p.current_rank === 'loading' 
-            ? '<div class="spinner-small"></div>' 
+
+        let todayHtml = p.current_rank === '-' || p.current_rank === 'loading'
+            ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
             : formatRank(p.current_rank);
-            
+
         if (p.prev_rank && p.prev_rank !== '-' && p.current_rank && p.current_rank !== '-' && p.current_rank !== '300위 밖' && p.current_rank !== 'loading') {
             const prev = parseInt(p.prev_rank), curr = parseInt(p.current_rank);
             if (!isNaN(prev) && !isNaN(curr)) {
                 const diff = prev - curr;
-                if (diff > 0) todayHtml += ` <span class="rank-down">▲${diff}</span>`;
-                else if (diff < 0) todayHtml += ` <span class="rank-up">▼${Math.abs(diff)}</span>`;
+                if (diff > 0) todayHtml += ` <span class="rank-up">▲${diff}</span>`;
+                else if (diff < 0) todayHtml += ` <span class="rank-down">▼${Math.abs(diff)}</span>`;
             }
         }
-        
-        let firstHtml = p.first_rank === '-' || p.first_rank === 'loading' 
-            ? '<div class="spinner-small"></div>' 
+
+        let firstHtml = p.first_rank === '-' || p.first_rank === 'loading'
+            ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
             : formatRank(p.first_rank);
-            
+
         tr.innerHTML = `
-            <td class="checkbox-col"><input type="checkbox" ${isChecked} onchange="toggleSelect(${p.id})"></td>
-            <td data-label="스토어명">${p.mall || '-'}</td>
-            <td data-label="상품명" style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.title || ''}">${p.title || '-'}</td>
-            <td data-label="MID">${p.mid}</td>
-            <td data-label="키워드">${p.keyword}</td>
-            <td data-label="최초순위" id="first-${p.id}">${firstHtml}</td>
-            <td data-label="이전순위">${formatRank(p.prev_rank)}</td>
-            <td data-label="오늘순위" id="rank-${p.id}">${todayHtml}</td>
-            <td>
-                <button class="btn btn-info" style="padding:4px 8px;font-size:11px" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
-                <button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteProduct(${p.id})">삭제</button>
+            <td class="checkbox-cell"><input type="checkbox" ${isChecked} onchange="toggleSelect(${p.id})"></td>
+            <td>${p.mall || '-'}</td>
+            <td class="truncate" style="max-width:120px" title="${p.title || ''}">${p.title || '-'}</td>
+            <td>${p.keyword}</td>
+            <td id="first-${p.id}">${firstHtml}</td>
+            <td>${formatRank(p.prev_rank)}</td>
+            <td id="rank-${p.id}">${todayHtml}</td>
+            <td class="action-cell">
+                <button class="btn btn-outline btn-xs" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
+                <button class="btn btn-danger btn-xs" onclick="deleteProduct(${p.id})">삭제</button>
             </td>`;
         tbody.appendChild(tr);
     });
-    
+
     document.getElementById('selectAll').checked = selectedIds.size === products.length && products.length > 0;
 }
 
@@ -236,14 +402,14 @@ function updateSelectedInfo() {
     const info = document.getElementById('selectedInfo');
     const count = document.getElementById('selectedCount');
     count.textContent = selectedIds.size;
-    if (selectedIds.size > 0) info.classList.add('show');
-    else info.classList.remove('show');
+    if (selectedIds.size > 0) info.classList.remove('hidden');
+    else info.classList.add('hidden');
 }
 
 async function deleteSelected() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`${selectedIds.size}개 상품을 삭제하시겠습니까?`)) return;
-    
+    if (!confirm(`${selectedIds.size}개 삭제?`)) return;
+
     try {
         const r = await fetch('/api/products/bulk-delete', {
             method: 'POST',
@@ -252,7 +418,6 @@ async function deleteSelected() {
         });
         const d = await r.json();
         if (d.success) {
-            alert(`${d.deleted}개 삭제 완료`);
             selectedIds.clear();
             loadProducts();
         } else alert(d.message);
@@ -274,7 +439,7 @@ async function checkSingleRank(pid) {
     try {
         const r = await fetch('/api/check-rank/' + pid, {method: 'POST'});
         const d = await r.json();
-        
+
         if (d.success) {
             const p = products.find(x => x.id === pid);
             if (p) {
@@ -283,12 +448,12 @@ async function checkSingleRank(pid) {
                 p.title = d.title || p.title;
                 p.mall = d.mall || p.mall;
             }
-            
+
             const rankCell = document.getElementById('rank-' + pid);
             const firstCell = document.getElementById('first-' + pid);
             if (rankCell) rankCell.innerHTML = formatRank(d.rank);
             if (firstCell) firstCell.innerHTML = formatRank(d.first_rank);
-            
+
             const row = document.getElementById('row-' + pid);
             if (row) {
                 row.cells[1].textContent = d.mall || '-';
@@ -305,15 +470,12 @@ async function addProduct() {
     const mid = document.getElementById('mid').value.trim();
     const kw = document.getElementById('keyword').value.trim();
     const btn = document.getElementById('addBtn');
-    
-    if (!mid || !kw) {
-        alert('MID와 키워드를 입력해주세요.');
-        return;
-    }
-    
+
+    if (!mid || !kw) { alert('MID와 키워드를 입력해주세요.'); return; }
+
     btn.disabled = true;
-    btn.textContent = '등록 중...';
-    
+    btn.textContent = '등록중...';
+
     try {
         const r = await fetch('/api/products/quick', {
             method: 'POST',
@@ -321,7 +483,7 @@ async function addProduct() {
             body: JSON.stringify({mid, keyword: kw})
         });
         const d = await r.json();
-        
+
         if (d.success) {
             document.getElementById('mid').value = '';
             document.getElementById('keyword').value = '';
@@ -331,30 +493,27 @@ async function addProduct() {
         alert('서버 연결 실패');
     } finally {
         btn.disabled = false;
-        btn.textContent = '등록하기';
+        btn.textContent = '등록';
     }
 }
 
 async function bulkUpload() {
     const fileInput = document.getElementById('excelFile');
     const btn = document.getElementById('bulkBtn');
-    
-    if (!fileInput.files[0]) {
-        alert('엑셀 파일을 선택해주세요.');
-        return;
-    }
-    
+
+    if (!fileInput.files[0]) { alert('파일을 선택해주세요.'); return; }
+
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
     btn.disabled = true;
-    btn.textContent = '업로드 중...';
-    
+    btn.textContent = '업로드중...';
+
     try {
         const r = await fetch('/api/bulk-upload', {method: 'POST', body: formData});
         const d = await r.json();
-        
+
         if (d.success) {
-            alert(`${d.count}개 상품이 등록되었습니다.\n순위 조회가 시작됩니다.`);
+            alert(`${d.count}개 등록 완료`);
             fileInput.value = '';
             await loadProducts();
         } else alert(d.message);
@@ -362,7 +521,7 @@ async function bulkUpload() {
         alert('업로드 실패');
     } finally {
         btn.disabled = false;
-        btn.textContent = '📁 대량등록';
+        btn.textContent = '대량등록';
     }
 }
 
@@ -371,8 +530,8 @@ function downloadSample() {
 }
 
 async function deleteProduct(id) {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    
+    if (!confirm('삭제하시겠습니까?')) return;
+
     try {
         const r = await fetch('/api/products/' + id, {method: 'DELETE'});
         const d = await r.json();
@@ -384,24 +543,24 @@ async function deleteProduct(id) {
 }
 
 async function refreshAll() {
-    if (!confirm('전체 순위를 새로고침하시겠습니까?\n(시간이 걸릴 수 있습니다)')) return;
-    
+    if (!confirm('전체 순위를 새로고침?')) return;
+
     const btn = document.getElementById('refreshBtn');
     btn.disabled = true;
-    btn.textContent = '조회 중...';
-    
+    btn.textContent = '조회중...';
+
     try {
         const r = await fetch('/api/refresh', {method: 'POST'});
         const d = await r.json();
         if (d.success) {
-            alert(`순위 조회 완료! (${d.updated}개 상품)`);
+            alert(`${d.updated}개 상품 조회 완료`);
             loadProducts();
         } else alert(d.message);
     } catch(e) {
         alert('서버 연결 실패');
     } finally {
         btn.disabled = false;
-        btn.textContent = '🔄 전체 새로고침';
+        btn.textContent = '새로고침';
     }
 }
 
@@ -410,10 +569,10 @@ async function showHistory(pid, kw) {
         const r = await fetch('/api/history/' + pid);
         const d = await r.json();
         document.getElementById('historyTitle').textContent = '키워드: ' + kw;
-        
+
         const tbody = document.getElementById('historyBody');
         tbody.innerHTML = '';
-        
+
         if (d.success && d.history.length > 0) {
             d.history.forEach(h => {
                 const tr = document.createElement('tr');
@@ -421,20 +580,23 @@ async function showHistory(pid, kw) {
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="2">이력이 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-gray)">이력 없음</td></tr>';
         }
-        
-        document.getElementById('historyModal').style.display = 'flex';
+
+        document.getElementById('historyModal').classList.remove('hidden');
     } catch(e) {
         alert('이력 조회 실패');
     }
 }
 
-function exportExcel() {
-    if (products.length === 0) {
-        alert('다운로드할 데이터가 없습니다.');
-        return;
+function closeHistoryModal(e) {
+    if (!e || e.target === e.currentTarget) {
+        document.getElementById('historyModal').classList.add('hidden');
     }
+}
+
+function exportExcel() {
+    if (products.length === 0) { alert('데이터가 없습니다.'); return; }
     window.location.href = '/api/export';
 }
 

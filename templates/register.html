@@ -1,43 +1,77 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="shoprank">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>회원가입</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 </head>
-<body class="auth-bg">
-<div class="auth-container">
-    <h1>📝 회원가입</h1>
-    <div class="notice-box">
-        ⚠️ 이름과 연락처는 정확하게 입력해주세요.<br>
-        허위 정보 입력 시 사전 안내 없이 계정이 삭제될 수 있습니다.
+<body class="min-h-screen bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-5">
+<div class="card w-full max-w-md bg-base-100 shadow-2xl">
+    <div class="card-body">
+        <h1 class="text-2xl font-bold text-center mb-4">📝 회원가입</h1>
+
+        <div class="alert alert-warning mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span class="text-sm">이름과 연락처는 정확하게 입력해주세요. 허위 정보 입력 시 사전 안내 없이 계정이 삭제될 수 있습니다.</span>
+        </div>
+
+        <div id="error" class="alert alert-error hidden mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span></span>
+        </div>
+
+        <div id="success" class="alert alert-success hidden mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span></span>
+        </div>
+
+        <div class="form-control w-full mb-3">
+            <label class="label">
+                <span class="label-text font-semibold">아이디</span>
+            </label>
+            <input type="text" id="userId" class="input input-bordered w-full">
+        </div>
+
+        <div class="form-control w-full mb-3">
+            <label class="label">
+                <span class="label-text font-semibold">비밀번호</span>
+            </label>
+            <input type="password" id="password" class="input input-bordered w-full">
+        </div>
+
+        <div class="form-control w-full mb-3">
+            <label class="label">
+                <span class="label-text font-semibold">비밀번호 확인</span>
+            </label>
+            <input type="password" id="password2" class="input input-bordered w-full">
+        </div>
+
+        <div class="form-control w-full mb-3">
+            <label class="label">
+                <span class="label-text font-semibold">이름</span>
+            </label>
+            <input type="text" id="name" class="input input-bordered w-full">
+        </div>
+
+        <div class="form-control w-full mb-6">
+            <label class="label">
+                <span class="label-text font-semibold">연락처</span>
+            </label>
+            <input type="text" id="phone" placeholder="01012345678" class="input input-bordered w-full">
+        </div>
+
+        <button class="btn btn-primary w-full mb-2" onclick="doRegister()">가입하기</button>
+        <button class="btn btn-ghost w-full" onclick="location.href='/login'">로그인으로</button>
     </div>
-    <div class="error" id="error"></div>
-    <div class="success" id="success"></div>
-    <div class="form-group">
-        <label>아이디</label>
-        <input type="text" id="userId">
-    </div>
-    <div class="form-group">
-        <label>비밀번호</label>
-        <input type="password" id="password">
-    </div>
-    <div class="form-group">
-        <label>비밀번호 확인</label>
-        <input type="password" id="password2">
-    </div>
-    <div class="form-group">
-        <label>이름</label>
-        <input type="text" id="name">
-    </div>
-    <div class="form-group">
-        <label>연락처</label>
-        <input type="text" id="phone" placeholder="01012345678">
-    </div>
-    <button class="auth-btn auth-btn-primary" onclick="doRegister()">가입하기</button>
-    <button class="auth-btn auth-btn-secondary" onclick="location.href='/login'">로그인으로</button>
 </div>
+
 <script>
 async function doRegister() {
     const u = document.getElementById('userId').value;
@@ -47,21 +81,21 @@ async function doRegister() {
     const ph = document.getElementById('phone').value.replace(/-/g, '');
     const err = document.getElementById('error');
     const suc = document.getElementById('success');
-    
-    err.style.display = 'none';
-    suc.style.display = 'none';
-    
+
+    err.classList.add('hidden');
+    suc.classList.add('hidden');
+
     if (!u || !p || !p2 || !n || !ph) {
-        err.textContent = '모든 항목을 입력해주세요.';
-        err.style.display = 'block';
+        err.querySelector('span').textContent = '모든 항목을 입력해주세요.';
+        err.classList.remove('hidden');
         return;
     }
     if (p !== p2) {
-        err.textContent = '비밀번호가 일치하지 않습니다.';
-        err.style.display = 'block';
+        err.querySelector('span').textContent = '비밀번호가 일치하지 않습니다.';
+        err.classList.remove('hidden');
         return;
     }
-    
+
     try {
         const r = await fetch('/api/register', {
             method: 'POST',
@@ -70,16 +104,16 @@ async function doRegister() {
         });
         const d = await r.json();
         if (d.success) {
-            suc.innerHTML = '회원가입 완료!<br>로그인해주세요.';
-            suc.style.display = 'block';
+            suc.querySelector('span').innerHTML = '회원가입 완료!<br>로그인해주세요.';
+            suc.classList.remove('hidden');
             setTimeout(() => location.href = '/login', 1500);
         } else {
-            err.textContent = d.message;
-            err.style.display = 'block';
+            err.querySelector('span').textContent = d.message;
+            err.classList.remove('hidden');
         }
     } catch(x) {
-        err.textContent = '서버 연결 실패';
-        err.style.display = 'block';
+        err.querySelector('span').textContent = '서버 연결 실패';
+        err.classList.remove('hidden');
     }
 }
 </script>
