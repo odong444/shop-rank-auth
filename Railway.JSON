@@ -2,7 +2,7 @@
   "crons": [
     {
       "schedule": "0 4 * * *",
-      "command": "python scheduler.py"
+      "command": "python Scheduler.py"
     }
   ]
 }
