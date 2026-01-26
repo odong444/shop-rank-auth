@@ -55,7 +55,20 @@ def init_db():
         code VARCHAR(6) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         verified BOOLEAN DEFAULT FALSE)''')
-    
+
+    # withdrawals 테이블 (출금 요청)
+    cur.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        amount INTEGER NOT NULL,
+        bank_name VARCHAR(50) NOT NULL,
+        account_number VARCHAR(50) NOT NULL,
+        account_holder VARCHAR(50) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP,
+        memo VARCHAR(200))''')
+
     conn.commit()
     
     # 기존 테이블에 새 컬럼 추가
@@ -144,6 +157,74 @@ def reset_all_usage():
     conn = get_db()
     cur = conn.cursor()
     cur.execute('UPDATE users SET product_score_used = 0, brand_sales_used = 0')
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_pending_withdrawals_count():
+    """대기 중인 출금 요청 수"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'")
+    count = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+    return count
+
+
+def get_all_withdrawals():
+    """전체 출금 요청 목록 (관리자용)"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''SELECT w.id, w.user_id, u.name, w.amount, w.bank_name, w.account_number,
+                   w.account_holder, w.status, w.requested_at, w.processed_at, w.memo
+                   FROM withdrawals w
+                   LEFT JOIN users u ON w.user_id = u.user_id
+                   ORDER BY w.requested_at DESC''')
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def get_user_withdrawals(user_id):
+    """사용자별 출금 요청 목록"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''SELECT id, amount, bank_name, account_number, account_holder,
+                   status, requested_at, processed_at, memo
+                   FROM withdrawals WHERE user_id = %s
+                   ORDER BY requested_at DESC''', (user_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def create_withdrawal(user_id, amount, bank_name, account_number, account_holder):
+    """출금 요청 생성"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''INSERT INTO withdrawals (user_id, amount, bank_name, account_number, account_holder)
+                   VALUES (%s, %s, %s, %s, %s) RETURNING id''',
+                (user_id, amount, bank_name, account_number, account_holder))
+    withdrawal_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return withdrawal_id
+
+
+def update_withdrawal_status(withdrawal_id, status, memo=None):
+    """출금 요청 상태 업데이트"""
+    conn = get_db()
+    cur = conn.cursor()
+    if status in ['approved', 'rejected']:
+        cur.execute('''UPDATE withdrawals SET status = %s, processed_at = CURRENT_TIMESTAMP, memo = %s
+                       WHERE id = %s''', (status, memo, withdrawal_id))
+    else:
+        cur.execute('UPDATE withdrawals SET status = %s WHERE id = %s', (status, withdrawal_id))
     conn.commit()
     cur.close()
     conn.close()

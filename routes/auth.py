@@ -4,7 +4,7 @@ import urllib.request
 import urllib.parse
 import json
 
-from utils.db import get_db
+from utils.db import get_db, get_user_withdrawals, create_withdrawal
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -42,6 +42,12 @@ def login_page():
 @auth_bp.route('/register')
 def register_page():
     return render_template('register.html')
+
+@auth_bp.route('/withdrawal')
+def withdrawal_page():
+    if not session.get('user_id'):
+        return redirect('/login')
+    return render_template('withdrawal.html', active_menu='withdrawal')
 
 
 # ===== API =====
@@ -183,14 +189,73 @@ def login_compat():
         u = cur.fetchone()
         cur.close()
         conn.close()
-        
+
         if not u:
             return jsonify({'success': False, 'message': '존재하지 않는 아이디입니다.'})
         if u[1] != d.get('password'):
             return jsonify({'success': False, 'message': '비밀번호가 일치하지 않습니다.'})
         if u[3] != 'Y':
             return jsonify({'success': False, 'message': '관리자 승인 대기 중입니다.\n승인 문의: 카카오톡 odong4444'})
-        
+
         return jsonify({'success': True, 'name': u[2]})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# ===== 출금 API =====
+
+@auth_bp.route('/api/withdrawals', methods=['GET'])
+def get_my_withdrawals():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'})
+
+    try:
+        rows = get_user_withdrawals(user_id)
+        withdrawals = []
+        for r in rows:
+            status_text = {'pending': '대기중', 'approved': '승인', 'rejected': '거절'}.get(r[5], r[5])
+            withdrawals.append({
+                'id': r[0],
+                'amount': r[1],
+                'bankName': r[2],
+                'accountNumber': r[3],
+                'accountHolder': r[4],
+                'status': r[5],
+                'statusText': status_text,
+                'requestedAt': r[6].strftime('%Y-%m-%d %H:%M') if r[6] else '',
+                'processedAt': r[7].strftime('%Y-%m-%d %H:%M') if r[7] else '',
+                'memo': r[8] or ''
+            })
+        return jsonify({'success': True, 'withdrawals': withdrawals})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@auth_bp.route('/api/withdrawals', methods=['POST'])
+def request_withdrawal():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'})
+
+    d = request.json
+    amount = d.get('amount')
+    bank_name = d.get('bankName')
+    account_number = d.get('accountNumber')
+    account_holder = d.get('accountHolder')
+
+    if not all([amount, bank_name, account_number, account_holder]):
+        return jsonify({'success': False, 'message': '모든 필드를 입력해주세요.'})
+
+    try:
+        amount = int(amount)
+        if amount <= 0:
+            return jsonify({'success': False, 'message': '출금 금액은 0보다 커야 합니다.'})
+    except ValueError:
+        return jsonify({'success': False, 'message': '올바른 금액을 입력해주세요.'})
+
+    try:
+        withdrawal_id = create_withdrawal(user_id, amount, bank_name, account_number, account_holder)
+        return jsonify({'success': True, 'id': withdrawal_id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})

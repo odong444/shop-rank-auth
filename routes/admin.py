@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, session, redirect, render_template
 
-from utils.db import get_db, reset_user_usage, reset_all_usage
+from utils.db import (get_db, reset_user_usage, reset_all_usage,
+                      get_pending_withdrawals_count, get_all_withdrawals,
+                      update_withdrawal_status)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -178,6 +180,53 @@ def reset_usage():
 def reset_all_usage_route():
     try:
         reset_all_usage()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/withdrawals/pending-count', methods=['GET'])
+def get_pending_count():
+    try:
+        count = get_pending_withdrawals_count()
+        return jsonify({'success': True, 'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/withdrawals', methods=['GET'])
+def get_withdrawals():
+    try:
+        rows = get_all_withdrawals()
+        withdrawals = []
+        for r in rows:
+            withdrawals.append({
+                'id': r[0],
+                'userId': r[1],
+                'userName': r[2] or r[1],
+                'amount': r[3],
+                'bankName': r[4],
+                'accountNumber': r[5],
+                'accountHolder': r[6],
+                'status': r[7],
+                'requestedAt': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
+                'processedAt': r[9].strftime('%Y-%m-%d %H:%M') if r[9] else '',
+                'memo': r[10] or ''
+            })
+        return jsonify({'success': True, 'withdrawals': withdrawals})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@admin_bp.route('/admin/withdrawals/process', methods=['POST'])
+def process_withdrawal():
+    d = request.json
+    withdrawal_id = d.get('id')
+    status = d.get('status')  # 'approved' or 'rejected'
+    memo = d.get('memo', '')
+
+    if status not in ['approved', 'rejected']:
+        return jsonify({'success': False, 'message': '유효하지 않은 상태입니다.'})
+
+    try:
+        update_withdrawal_status(withdrawal_id, status, memo)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})

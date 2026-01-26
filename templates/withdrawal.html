@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}출금 요청{% endblock %}
+
+{% block extra_css %}
+<style>
+.withdrawal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.form-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-gray);
+}
+.history-item {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+.history-item .amount {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+.history-item .info {
+    font-size: 0.75rem;
+    color: var(--text-gray);
+    margin-top: 4px;
+}
+.history-item .status {
+    margin-top: 8px;
+}
+.status-pending { color: #F59E0B; }
+.status-approved { color: #10B981; }
+.status-rejected { color: #EF4444; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 출금 요청 폼 -->
+<div class="card mb-4">
+    <div class="card-title">출금 요청</div>
+    <div class="withdrawal-form">
+        <div class="form-group">
+            <label>출금 금액</label>
+            <input type="number" id="amount" placeholder="금액 입력" class="input">
+        </div>
+        <div class="form-group">
+            <label>은행명</label>
+            <input type="text" id="bankName" placeholder="예: 국민은행" class="input">
+        </div>
+        <div class="form-group">
+            <label>계좌번호</label>
+            <input type="text" id="accountNumber" placeholder="- 없이 숫자만 입력" class="input">
+        </div>
+        <div class="form-group">
+            <label>예금주</label>
+            <input type="text" id="accountHolder" placeholder="예금주명" class="input">
+        </div>
+        <button onclick="requestWithdrawal()" class="btn btn-primary w-full">출금 요청</button>
+    </div>
+</div>
+
+<!-- 출금 내역 -->
+<div class="card">
+    <div class="card-title">출금 내역</div>
+    <div id="withdrawalHistory">
+        <p class="text-sm text-gray text-center py-4">내역을 불러오는 중...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadWithdrawalHistory() {
+    try {
+        const r = await fetch('/api/withdrawals');
+        const d = await r.json();
+
+        const container = document.getElementById('withdrawalHistory');
+
+        if (d.success && d.withdrawals.length > 0) {
+            container.innerHTML = d.withdrawals.map(w => `
+                <div class="history-item">
+                    <div class="amount">${formatNumber(w.amount)}원</div>
+                    <div class="info">
+                        ${w.bankName} ${w.accountNumber} (${w.accountHolder})<br>
+                        요청일: ${w.requestedAt}
+                        ${w.processedAt ? '<br>처리일: ' + w.processedAt : ''}
+                        ${w.memo ? '<br>메모: ' + w.memo : ''}
+                    </div>
+                    <div class="status">
+                        <span class="badge ${getStatusClass(w.status)}">${w.statusText}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<p class="text-sm text-gray text-center py-4">출금 내역이 없습니다.</p>';
+        }
+    } catch(e) {
+        document.getElementById('withdrawalHistory').innerHTML = '<p class="text-sm text-gray text-center py-4">내역을 불러오지 못했습니다.</p>';
+    }
+}
+
+function getStatusClass(status) {
+    const classes = {
+        pending: 'badge-warning',
+        approved: 'badge-success',
+        rejected: 'badge-error'
+    };
+    return classes[status] || 'badge-gray';
+}
+
+async function requestWithdrawal() {
+    const amount = document.getElementById('amount').value;
+    const bankName = document.getElementById('bankName').value.trim();
+    const accountNumber = document.getElementById('accountNumber').value.trim();
+    const accountHolder = document.getElementById('accountHolder').value.trim();
+
+    if (!amount || !bankName || !accountNumber || !accountHolder) {
+        alert('모든 필드를 입력해주세요.');
+        return;
+    }
+
+    if (parseInt(amount) <= 0) {
+        alert('올바른 금액을 입력해주세요.');
+        return;
+    }
+
+    try {
+        const r = await fetch('/api/withdrawals', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                amount: amount,
+                bankName: bankName,
+                accountNumber: accountNumber,
+                accountHolder: accountHolder
+            })
+        });
+        const d = await r.json();
+
+        if (d.success) {
+            alert('출금 요청이 완료되었습니다.\n관리자 승인 후 처리됩니다.');
+            document.getElementById('amount').value = '';
+            document.getElementById('bankName').value = '';
+            document.getElementById('accountNumber').value = '';
+            document.getElementById('accountHolder').value = '';
+            loadWithdrawalHistory();
+        } else {
+            alert(d.message || '출금 요청에 실패했습니다.');
+        }
+    } catch(e) {
+        alert('출금 요청에 실패했습니다.');
+    }
+}
+
+loadWithdrawalHistory();
+</script>
+{% endblock %}
