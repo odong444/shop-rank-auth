@@ -11,11 +11,22 @@
     <div class="card-body">
         <h1 class="text-2xl font-bold text-center mb-4">📝 회원가입</h1>
 
-        <div class="alert alert-warning mb-4">
+        <div class="alert alert-warning mb-3">
             <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <span class="text-sm">이름과 연락처는 정확하게 입력해주세요. 허위 정보 입력 시 사전 안내 없이 계정이 삭제될 수 있습니다.</span>
+        </div>
+
+        <!-- 혜택 안내 -->
+        <div class="alert alert-success mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>
+            <div class="text-sm">
+                <span class="font-bold">마케팅 수신 동의 시 혜택!</span><br>
+                상품지수 <span class="font-bold text-primary">30회</span> + 매출조회 <span class="font-bold text-primary">30회</span> 무료 제공
+            </div>
         </div>
 
         <div id="error" class="alert alert-error hidden mb-4">
@@ -83,14 +94,15 @@
                     <a href="#" onclick="showTerms('privacy')" class="text-primary text-xs underline">[보기]</a>
                 </label>
             </div>
-            <div class="form-control">
+            <div class="form-control bg-success/10 rounded-lg p-2 -mx-2">
                 <label class="label cursor-pointer justify-start gap-3">
-                    <input type="checkbox" id="marketingAgree" class="checkbox checkbox-sm">
-                    <span class="label-text">[선택] 마케팅 정보 수신 동의</span>
+                    <input type="checkbox" id="marketingAgree" class="checkbox checkbox-success checkbox-sm">
+                    <span class="label-text font-semibold">[선택] 마케팅 정보 수신 동의</span>
+                    <span class="badge badge-success badge-sm">추천</span>
                 </label>
-                <div class="ml-7 text-xs text-success">
-                    * 동의 시 상품지수 30회, 매출조회 30회 무료 제공<br>
-                    <span class="text-base-content/50">(미동의 시 각 3회 제공)</span>
+                <div class="ml-7 text-sm text-success font-medium">
+                    ✨ 동의 시 상품지수 <span class="font-bold">30회</span>, 매출조회 <span class="font-bold">30회</span> 무료!<br>
+                    <span class="text-xs text-base-content/50">(미동의 시 각 3회만 제공)</span>
                 </div>
             </div>
             <div class="divider my-2"></div>
