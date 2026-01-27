@@ -89,8 +89,18 @@ def init_db():
         conn.rollback()
     
     # users 테이블에 사용량 컬럼 추가
-    for col in [("product_score_used", "INTEGER DEFAULT 0"), 
+    for col in [("product_score_used", "INTEGER DEFAULT 0"),
                 ("brand_sales_used", "INTEGER DEFAULT 0")]:
+        try:
+            cur.execute(f"ALTER TABLE users ADD COLUMN {col[0]} {col[1]}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
+    # users 테이블에 약관 동의 컬럼 추가
+    for col in [("terms_agreed", "BOOLEAN DEFAULT FALSE"),
+                ("marketing_agreed", "BOOLEAN DEFAULT FALSE"),
+                ("terms_agreed_at", "TIMESTAMP")]:
         try:
             cur.execute(f"ALTER TABLE users ADD COLUMN {col[0]} {col[1]}")
             conn.commit()

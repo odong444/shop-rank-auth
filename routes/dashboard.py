@@ -21,6 +21,9 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
             return redirect('/login')
+        # 약관 동의 체크 (API가 아닌 페이지 요청에만 적용)
+        if not request.path.startswith('/api/') and not session.get('terms_agreed'):
+            return redirect('/terms')
         return f(*args, **kwargs)
     return decorated
 

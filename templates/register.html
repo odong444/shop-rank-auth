@@ -60,11 +60,42 @@
             <input type="text" id="name" class="input input-bordered w-full">
         </div>
 
-        <div class="form-control w-full mb-6">
+        <div class="form-control w-full mb-4">
             <label class="label">
                 <span class="label-text font-semibold">연락처</span>
             </label>
             <input type="text" id="phone" placeholder="01012345678" class="input input-bordered w-full">
+        </div>
+
+        <!-- 약관 동의 -->
+        <div class="bg-base-200 rounded-lg p-4 mb-4">
+            <div class="form-control mb-2">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" id="termsAgree" class="checkbox checkbox-primary checkbox-sm">
+                    <span class="label-text">[필수] 서비스 이용약관 동의</span>
+                    <a href="#" onclick="showTerms('service')" class="text-primary text-xs underline">[보기]</a>
+                </label>
+            </div>
+            <div class="form-control mb-2">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" id="privacyAgree" class="checkbox checkbox-primary checkbox-sm">
+                    <span class="label-text">[필수] 개인정보 수집 및 이용 동의</span>
+                    <a href="#" onclick="showTerms('privacy')" class="text-primary text-xs underline">[보기]</a>
+                </label>
+            </div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" id="marketingAgree" class="checkbox checkbox-sm">
+                    <span class="label-text">[선택] 마케팅 정보 수신 동의</span>
+                </label>
+            </div>
+            <div class="divider my-2"></div>
+            <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" id="allAgree" class="checkbox checkbox-primary checkbox-sm" onchange="toggleAllAgree()">
+                    <span class="label-text font-semibold">전체 동의</span>
+                </label>
+            </div>
         </div>
 
         <button class="btn btn-primary w-full mb-2" onclick="doRegister()">가입하기</button>
@@ -73,12 +104,46 @@
 </div>
 
 <script>
+function toggleAllAgree() {
+    const allAgree = document.getElementById('allAgree').checked;
+    document.getElementById('termsAgree').checked = allAgree;
+    document.getElementById('privacyAgree').checked = allAgree;
+    document.getElementById('marketingAgree').checked = allAgree;
+}
+
+function showTerms(type) {
+    if (type === 'service') {
+        alert(`[서비스 이용약관]
+
+제1조 (목적)
+본 약관은 BW RANK 서비스 이용에 관한 조건 및 절차를 규정합니다.
+
+제2조 (서비스 이용)
+1. 회원은 서비스를 이용함에 있어 관련 법령을 준수해야 합니다.
+2. 서비스의 무단 복제, 배포, 영리 목적 사용을 금지합니다.
+
+제3조 (면책)
+1. 서비스 이용으로 인한 손해에 대해 회사는 책임지지 않습니다.
+2. 데이터의 정확성을 보장하지 않습니다.`);
+    } else if (type === 'privacy') {
+        alert(`[개인정보 수집 및 이용 동의]
+
+1. 수집 항목: 아이디, 비밀번호, 이름, 연락처
+2. 수집 목적: 회원 관리, 서비스 제공
+3. 보유 기간: 회원 탈퇴 시까지
+4. 동의 거부 시 서비스 이용이 제한됩니다.`);
+    }
+}
+
 async function doRegister() {
     const u = document.getElementById('userId').value;
     const p = document.getElementById('password').value;
     const p2 = document.getElementById('password2').value;
     const n = document.getElementById('name').value;
     const ph = document.getElementById('phone').value.replace(/-/g, '');
+    const termsAgree = document.getElementById('termsAgree').checked;
+    const privacyAgree = document.getElementById('privacyAgree').checked;
+    const marketingAgree = document.getElementById('marketingAgree').checked;
     const err = document.getElementById('error');
     const suc = document.getElementById('success');
 
@@ -95,12 +160,21 @@ async function doRegister() {
         err.classList.remove('hidden');
         return;
     }
+    if (!termsAgree || !privacyAgree) {
+        err.querySelector('span').textContent = '필수 약관에 동의해주세요.';
+        err.classList.remove('hidden');
+        return;
+    }
 
     try {
         const r = await fetch('/api/register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({userId: u, password: p, name: n, phone: ph})
+            body: JSON.stringify({
+                userId: u, password: p, name: n, phone: ph,
+                termsAgreed: termsAgree && privacyAgree,
+                marketingAgreed: marketingAgree
+            })
         });
         const d = await r.json();
         if (d.success) {
@@ -116,6 +190,16 @@ async function doRegister() {
         err.classList.remove('hidden');
     }
 }
+
+// 개별 체크박스 변경 시 전체동의 상태 업데이트
+['termsAgree', 'privacyAgree', 'marketingAgree'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+        const all = document.getElementById('termsAgree').checked &&
+                    document.getElementById('privacyAgree').checked &&
+                    document.getElementById('marketingAgree').checked;
+        document.getElementById('allAgree').checked = all;
+    });
+});
 </script>
 </body>
 </html>

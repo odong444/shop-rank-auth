@@ -188,7 +188,11 @@ async function doLogin() {
         });
         const d = await r.json();
         if (d.success) {
-            location.href = '/dashboard';
+            if (d.needTerms) {
+                location.href = '/terms';
+            } else {
+                location.href = '/dashboard';
+            }
         } else {
             e.textContent = d.message;
             e.classList.add('show');

@@ -49,6 +49,39 @@ def withdrawal_page():
         return redirect('/login')
     return render_template('withdrawal.html', active_menu='withdrawal')
 
+@auth_bp.route('/terms')
+def terms_page():
+    if not session.get('user_id'):
+        return redirect('/login')
+    return render_template('terms.html')
+
+@auth_bp.route('/api/agree-terms', methods=['POST'])
+def agree_terms():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'})
+
+    d = request.json
+    terms_agreed = d.get('termsAgreed', False)
+    marketing_agreed = d.get('marketingAgreed', False)
+
+    if not terms_agreed:
+        return jsonify({'success': False, 'message': '필수 약관에 동의해주세요.'})
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''UPDATE users SET terms_agreed = %s, marketing_agreed = %s, terms_agreed_at = CURRENT_TIMESTAMP
+                       WHERE user_id = %s''', (terms_agreed, marketing_agreed, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        session['terms_agreed'] = True
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 
 # ===== API =====
 
@@ -61,12 +94,13 @@ def api_login():
         session['user_id'] = 'test'
         session['name'] = '테스트유저'
         session['role'] = 'admin'
-        return jsonify({'success': True, 'name': '테스트유저'})
+        session['terms_agreed'] = True
+        return jsonify({'success': True, 'name': '테스트유저', 'needTerms': False})
 
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute('SELECT user_id,password,name,approved,role FROM users WHERE user_id=%s', (d.get('userId'),))
+        cur.execute('SELECT user_id,password,name,approved,role,terms_agreed FROM users WHERE user_id=%s', (d.get('userId'),))
         u = cur.fetchone()
         cur.close()
         conn.close()
@@ -81,7 +115,11 @@ def api_login():
         session['user_id'] = d.get('userId')
         session['name'] = u[2]
         session['role'] = u[4] or 'normal'
-        return jsonify({'success': True, 'name': u[2]})
+        session['terms_agreed'] = u[5] or False
+
+        # 약관 미동의 시 약관 동의 페이지로 이동 필요
+        need_terms = not (u[5] or False)
+        return jsonify({'success': True, 'name': u[2], 'needTerms': need_terms})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
@@ -96,10 +134,14 @@ def api_register():
             cur.close()
             conn.close()
             return jsonify({'success': False, 'message': '이미 사용 중인 아이디입니다.'})
-        
+
         phone = d.get('phone', '').replace('-', '')
-        cur.execute('INSERT INTO users (user_id,password,name,phone,approved) VALUES (%s,%s,%s,%s,%s)',
-                    (d.get('userId'), d.get('password'), d.get('name'), phone, 'Y'))
+        terms_agreed = d.get('termsAgreed', False)
+        marketing_agreed = d.get('marketingAgreed', False)
+
+        cur.execute('''INSERT INTO users (user_id, password, name, phone, approved, terms_agreed, marketing_agreed, terms_agreed_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)''',
+                    (d.get('userId'), d.get('password'), d.get('name'), phone, 'Y', terms_agreed, marketing_agreed))
         conn.commit()
         cur.close()
         conn.close()
