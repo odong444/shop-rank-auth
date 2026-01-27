@@ -115,17 +115,18 @@ def get_user_usage(user_id):
     """사용자의 사용량 및 권한 정보 조회"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('''SELECT role, product_score_used, brand_sales_used 
+    cur.execute('''SELECT role, product_score_used, brand_sales_used, marketing_agreed
                    FROM users WHERE user_id = %s''', (user_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
-    
+
     if row:
         return {
             'role': row[0] or 'normal',
             'product_score_used': row[1] or 0,
-            'brand_sales_used': row[2] or 0
+            'brand_sales_used': row[2] or 0,
+            'marketing_agreed': row[3] or False
         }
     return None
 

@@ -10,7 +10,8 @@ product_score_bp = Blueprint('product_score', __name__)
 RANK_API_URL = os.environ.get('RANK_API_URL', '')
 
 # 일반 등급 무료 사용 횟수
-FREE_LIMIT = 30
+FREE_LIMIT_MARKETING = 30  # 마케팅 동의
+FREE_LIMIT_DEFAULT = 3     # 마케팅 미동의
 
 
 def login_required(f):
@@ -36,13 +37,14 @@ def check_product_score_usage():
     """상품지수 사용 가능 여부 확인"""
     user_id = session['user_id']
     usage = get_user_usage(user_id)
-    
+
     if not usage:
         return jsonify({'success': False, 'message': '사용자 정보를 찾을 수 없습니다.'})
-    
+
     role = usage['role']
     used = usage['product_score_used']
-    
+    marketing_agreed = usage.get('marketing_agreed', False)
+
     # 고객/관리자는 무제한
     if role in ['customer', 'admin']:
         return jsonify({
@@ -53,17 +55,18 @@ def check_product_score_usage():
             'limit': -1,  # 무제한
             'remaining': -1
         })
-    
-    # 일반 등급은 30회 제한
-    can_use = used < FREE_LIMIT
-    remaining = FREE_LIMIT - used
-    
+
+    # 일반 등급: 마케팅 동의 여부에 따라 제한
+    free_limit = FREE_LIMIT_MARKETING if marketing_agreed else FREE_LIMIT_DEFAULT
+    can_use = used < free_limit
+    remaining = free_limit - used
+
     return jsonify({
         'success': True,
         'canUse': can_use,
         'role': role,
         'used': used,
-        'limit': FREE_LIMIT,
+        'limit': free_limit,
         'remaining': max(0, remaining)
     })
 
@@ -74,28 +77,31 @@ def use_product_score():
     """상품지수 사용 (횟수 차감)"""
     user_id = session['user_id']
     usage = get_user_usage(user_id)
-    
+
     if not usage:
         return jsonify({'success': False, 'message': '사용자 정보를 찾을 수 없습니다.'})
-    
+
     role = usage['role']
     used = usage['product_score_used']
-    
+    marketing_agreed = usage.get('marketing_agreed', False)
+
     # 고객/관리자는 무제한
     if role in ['customer', 'admin']:
         increment_usage(user_id, 'product_score')
         return jsonify({'success': True, 'remaining': -1})
-    
-    # 일반 등급 횟수 체크
-    if used >= FREE_LIMIT:
+
+    # 일반 등급: 마케팅 동의 여부에 따라 제한
+    free_limit = FREE_LIMIT_MARKETING if marketing_agreed else FREE_LIMIT_DEFAULT
+
+    if used >= free_limit:
         return jsonify({
-            'success': False, 
-            'message': f'무료 사용 횟수({FREE_LIMIT}회)를 모두 사용했습니다. 등급 업그레이드가 필요합니다.'
+            'success': False,
+            'message': f'무료 사용 횟수({free_limit}회)를 모두 사용했습니다. 등급 업그레이드가 필요합니다.'
         })
-    
+
     increment_usage(user_id, 'product_score')
-    remaining = FREE_LIMIT - used - 1
-    
+    remaining = free_limit - used - 1
+
     return jsonify({
         'success': True,
         'remaining': remaining,

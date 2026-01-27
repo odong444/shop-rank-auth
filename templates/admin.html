@@ -24,7 +24,7 @@
         <div class="card-body py-4">
             <h4 class="font-bold mb-2">📋 회원 등급 안내</h4>
             <ul class="text-sm space-y-1">
-                <li><span class="badge badge-ghost">일반</span> - 순위조회 무제한 / 상품지수 30회 / 매출조회 30회</li>
+                <li><span class="badge badge-ghost">일반</span> - 순위조회 무제한 / 상품지수·매출조회: 마케팅동의 30회, 미동의 3회</li>
                 <li><span class="badge badge-success">고객</span> - 전체 기능 무제한</li>
                 <li><span class="badge badge-info">관리자</span> - 전체 기능 무제한 + 관리 기능</li>
             </ul>
@@ -136,7 +136,8 @@
 </div>
 
 <script>
-const FREE_LIMIT = 30;
+const FREE_LIMIT_MARKETING = 30;
+const FREE_LIMIT_DEFAULT = 3;
 
 function showTab(tab) {
     // 탭 버튼 스타일
@@ -174,18 +175,23 @@ function getRoleSelect(userId, currentRole) {
     `;
 }
 
-function getUsageDisplay(role, productScoreUsed, brandSalesUsed) {
+function getUsageDisplay(role, productScoreUsed, brandSalesUsed, marketingAgreed) {
     if (role === 'customer' || role === 'admin') {
         return '<span class="badge badge-success badge-sm">무제한</span>';
     }
 
-    const psClass = productScoreUsed >= FREE_LIMIT ? 'text-error' : 'text-success';
-    const bsClass = brandSalesUsed >= FREE_LIMIT ? 'text-error' : 'text-success';
+    const limit = marketingAgreed ? FREE_LIMIT_MARKETING : FREE_LIMIT_DEFAULT;
+    const psClass = productScoreUsed >= limit ? 'text-error' : 'text-success';
+    const bsClass = brandSalesUsed >= limit ? 'text-error' : 'text-success';
+    const marketingBadge = marketingAgreed
+        ? '<span class="badge badge-success badge-xs">마케팅O</span>'
+        : '<span class="badge badge-ghost badge-xs">마케팅X</span>';
 
     return `
         <div class="text-xs space-y-1">
-            <div>상품지수: <span class="${psClass} font-bold">${productScoreUsed}/${FREE_LIMIT}</span></div>
-            <div>매출조회: <span class="${bsClass} font-bold">${brandSalesUsed}/${FREE_LIMIT}</span></div>
+            <div>${marketingBadge}</div>
+            <div>상품지수: <span class="${psClass} font-bold">${productScoreUsed}/${limit}</span></div>
+            <div>매출조회: <span class="${bsClass} font-bold">${brandSalesUsed}/${limit}</span></div>
         </div>
     `;
 }
@@ -237,7 +243,7 @@ async function loadUsers() {
                     <td>${u.regDate}</td>
                     <td>${u.productCount || 0}개</td>
                     <td>${getRoleSelect(u.userId, role)}</td>
-                    <td>${getUsageDisplay(role, u.productScoreUsed || 0, u.brandSalesUsed || 0)}</td>
+                    <td>${getUsageDisplay(role, u.productScoreUsed || 0, u.brandSalesUsed || 0, u.marketingAgreed)}</td>
                     <td>
                         ${u.approved === 'Y'
                             ? '<span class="badge badge-success badge-sm">승인됨</span>'
