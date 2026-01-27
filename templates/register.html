@@ -462,6 +462,14 @@ async function doRegister() {
         return;
     }
 
+    // 마케팅 동의 안 했을 때 재확인
+    if (!marketingAgree) {
+        const reallyNo = confirm('정말 동의 안하세요..? 🥺\n\n상품지수 30회, 매출조회 30회 무료인데..?\n추가로 더 드릴수도 있는데..?\n\n[확인] 그래도 안 할래요\n[취소] 다시 생각해볼게요');
+        if (!reallyNo) {
+            return;
+        }
+    }
+
     try {
         const r = await fetch('/api/register', {
             method: 'POST',
