@@ -432,17 +432,19 @@ async function checkNoticePopup() {
     try {
         const r = await fetch('/api/notices/popup');
         const d = await r.json();
-        if (d.success && d.notices.length > 0) {
+        // 공지가 있고, 제목이 있을 때만 팝업 표시
+        if (d.success && d.notices && d.notices.length > 0) {
             const notice = d.notices[0];
-            // 제목이나 내용이 있을 때만 팝업 표시
-            if (notice.title || notice.content) {
-                document.getElementById('noticePopupTitle').textContent = '📢 ' + (notice.title || '공지사항');
+            if (notice && notice.title && notice.title.trim() !== '') {
+                document.getElementById('noticePopupTitle').textContent = '📢 ' + notice.title;
                 document.getElementById('noticePopupContent').textContent = notice.content || '';
                 document.getElementById('noticePopupOverlay').classList.remove('hidden');
                 document.getElementById('noticePopupOverlay').style.display = 'flex';
             }
         }
-    } catch(e) {}
+    } catch(e) {
+        // 에러 시 팝업 안 띄움
+    }
 }
 
 function closeNoticePopup(dismissToday) {
