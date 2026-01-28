@@ -125,7 +125,14 @@ def init_db():
             conn.commit()
         except Exception:
             conn.rollback()
-    
+
+    # notices 테이블 컬럼 크기 확장
+    try:
+        cur.execute("ALTER TABLE notices ALTER COLUMN title TYPE VARCHAR(500)")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     cur.close()
     conn.close()
 
