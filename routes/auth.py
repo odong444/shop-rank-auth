@@ -119,6 +119,8 @@ def api_login():
 
         # 로그인 로그 기록
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip_address:
+            ip_address = ip_address.split(',')[0].strip()[:50]  # 첫 번째 IP만 사용
         add_user_log(d.get('userId'), 'login', None, ip_address)
 
         # 약관 미동의 시 약관 동의 페이지로 이동 필요

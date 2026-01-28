@@ -133,6 +133,13 @@ def init_db():
     except Exception:
         conn.rollback()
 
+    # user_logs 테이블 컬럼 크기 확장
+    try:
+        cur.execute("ALTER TABLE user_logs ALTER COLUMN ip_address TYPE VARCHAR(200)")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     cur.close()
     conn.close()
 
