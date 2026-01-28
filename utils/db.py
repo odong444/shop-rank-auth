@@ -69,6 +69,25 @@ def init_db():
         processed_at TIMESTAMP,
         memo VARCHAR(200))''')
 
+    # user_logs 테이블 (방문/이용 기록)
+    cur.execute('''CREATE TABLE IF NOT EXISTS user_logs (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        detail VARCHAR(200),
+        ip_address VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # notices 테이블 (공지사항)
+    cur.execute('''CREATE TABLE IF NOT EXISTS notices (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        content TEXT,
+        is_popup BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
     conn.commit()
     
     # 기존 테이블에 새 컬럼 추가
@@ -239,3 +258,143 @@ def update_withdrawal_status(withdrawal_id, status, memo=None):
     conn.commit()
     cur.close()
     conn.close()
+
+
+# ===== 사용자 로그 관련 =====
+
+def add_user_log(user_id, action, detail=None, ip_address=None):
+    """사용자 활동 로그 추가"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''INSERT INTO user_logs (user_id, action, detail, ip_address)
+                   VALUES (%s, %s, %s, %s)''', (user_id, action, detail, ip_address))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_user_logs(limit=100, user_id=None, action=None):
+    """사용자 로그 조회"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    query = '''SELECT l.id, l.user_id, u.name, l.action, l.detail, l.ip_address, l.created_at
+               FROM user_logs l
+               LEFT JOIN users u ON l.user_id = u.user_id
+               WHERE 1=1'''
+    params = []
+
+    if user_id:
+        query += ' AND l.user_id = %s'
+        params.append(user_id)
+    if action:
+        query += ' AND l.action = %s'
+        params.append(action)
+
+    query += ' ORDER BY l.created_at DESC LIMIT %s'
+    params.append(limit)
+
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def get_log_stats():
+    """로그 통계 (오늘 방문자 수, 기능별 사용 횟수 등)"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 오늘 로그인 수
+    cur.execute("""SELECT COUNT(DISTINCT user_id) FROM user_logs
+                   WHERE action = 'login' AND DATE(created_at) = CURRENT_DATE""")
+    today_logins = cur.fetchone()[0]
+
+    # 오늘 기능 사용 횟수
+    cur.execute("""SELECT action, COUNT(*) FROM user_logs
+                   WHERE DATE(created_at) = CURRENT_DATE
+                   GROUP BY action ORDER BY COUNT(*) DESC""")
+    today_actions = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return {
+        'today_logins': today_logins,
+        'today_actions': today_actions
+    }
+
+
+# ===== 공지사항 관련 =====
+
+def get_notices(active_only=False):
+    """공지사항 목록 조회"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    if active_only:
+        cur.execute('SELECT id, title, content, is_popup, is_active, created_at FROM notices WHERE is_active = TRUE ORDER BY created_at DESC')
+    else:
+        cur.execute('SELECT id, title, content, is_popup, is_active, created_at FROM notices ORDER BY created_at DESC')
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def get_notice(notice_id):
+    """공지사항 상세 조회"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('SELECT id, title, content, is_popup, is_active, created_at FROM notices WHERE id = %s', (notice_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row
+
+
+def create_notice(title, content, is_popup=False):
+    """공지사항 생성"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''INSERT INTO notices (title, content, is_popup) VALUES (%s, %s, %s) RETURNING id''',
+                (title, content, is_popup))
+    notice_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return notice_id
+
+
+def update_notice(notice_id, title, content, is_popup, is_active):
+    """공지사항 수정"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''UPDATE notices SET title = %s, content = %s, is_popup = %s, is_active = %s, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = %s''', (title, content, is_popup, is_active, notice_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def delete_notice(notice_id):
+    """공지사항 삭제"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('DELETE FROM notices WHERE id = %s', (notice_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_popup_notices():
+    """팝업 공지사항 조회 (활성화된 것만)"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('SELECT id, title, content FROM notices WHERE is_popup = TRUE AND is_active = TRUE ORDER BY created_at DESC')
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows

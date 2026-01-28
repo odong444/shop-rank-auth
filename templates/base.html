@@ -415,7 +415,49 @@
     </nav>
 </div>
 
+<!-- 공지사항 팝업 모달 -->
+<div id="noticePopupOverlay" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:20px;max-width:90%;width:360px;max-height:80vh;overflow-y:auto;">
+        <h3 id="noticePopupTitle" style="font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--primary);">📢 공지사항</h3>
+        <div id="noticePopupContent" style="font-size:0.875rem;line-height:1.6;white-space:pre-wrap;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+            <button onclick="closeNoticePopup(true)" style="flex:1;padding:10px;background:var(--bg-gray);border:none;border-radius:8px;font-size:0.813rem;cursor:pointer;">오늘 하루 안 보기</button>
+            <button onclick="closeNoticePopup(false)" style="flex:1;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:0.813rem;cursor:pointer;">확인</button>
+        </div>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+<script>
+// 공지사항 팝업
+async function checkNoticePopup() {
+    const today = new Date().toDateString();
+    const dismissed = localStorage.getItem('noticeDismissed');
+    if (dismissed === today) return;
+
+    try {
+        const r = await fetch('/api/notices/popup');
+        const d = await r.json();
+        if (d.success && d.notices.length > 0) {
+            const notice = d.notices[0];
+            document.getElementById('noticePopupTitle').textContent = '📢 ' + notice.title;
+            document.getElementById('noticePopupContent').textContent = notice.content;
+            document.getElementById('noticePopupOverlay').classList.remove('hidden');
+            document.getElementById('noticePopupOverlay').style.display = 'flex';
+        }
+    } catch(e) {}
+}
+
+function closeNoticePopup(dismissToday) {
+    if (dismissToday) {
+        localStorage.setItem('noticeDismissed', new Date().toDateString());
+    }
+    document.getElementById('noticePopupOverlay').classList.add('hidden');
+    document.getElementById('noticePopupOverlay').style.display = 'none';
+}
+
+checkNoticePopup();
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

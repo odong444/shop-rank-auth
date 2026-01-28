@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, session, redirect, render_templat
 from functools import wraps
 import os
 
-from utils.db import get_db, get_user_usage, increment_usage
+from utils.db import get_db, get_user_usage, increment_usage, add_user_log
 
 brand_sales_bp = Blueprint('brand_sales', __name__)
 
@@ -88,6 +88,7 @@ def use_brand_sales():
     # 고객/관리자는 무제한
     if role in ['customer', 'admin']:
         increment_usage(user_id, 'brand_sales')
+        add_user_log(user_id, 'brand_sales', f'사용 (무제한)')
         return jsonify({'success': True, 'remaining': -1})
 
     # 일반 등급: 마케팅 동의 여부에 따라 제한
@@ -101,6 +102,7 @@ def use_brand_sales():
 
     increment_usage(user_id, 'brand_sales')
     remaining = free_limit - used - 1
+    add_user_log(user_id, 'brand_sales', f'사용 ({used + 1}/{free_limit})')
 
     return jsonify({
         'success': True,

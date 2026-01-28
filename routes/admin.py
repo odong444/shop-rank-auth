@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify, session, redirect, render_templat
 
 from utils.db import (get_db, reset_user_usage, reset_all_usage,
                       get_pending_withdrawals_count, get_all_withdrawals,
-                      update_withdrawal_status)
+                      update_withdrawal_status, get_user_logs, get_log_stats,
+                      get_notices, get_notice, create_notice, update_notice, delete_notice)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -229,5 +230,159 @@ def process_withdrawal():
     try:
         update_withdrawal_status(withdrawal_id, status, memo)
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# ===== 사용자 로그 관리 =====
+
+@admin_bp.route('/admin/logs', methods=['GET'])
+def get_logs():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        user_id = request.args.get('user_id', '')
+        action = request.args.get('action', '')
+
+        rows = get_user_logs(limit, user_id or None, action or None)
+        logs = []
+        for r in rows:
+            logs.append({
+                'id': r[0],
+                'userId': r[1],
+                'userName': r[2] or r[1],
+                'action': r[3],
+                'detail': r[4] or '',
+                'ipAddress': r[5] or '',
+                'createdAt': r[6].strftime('%Y-%m-%d %H:%M:%S') if r[6] else ''
+            })
+        return jsonify({'success': True, 'logs': logs})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@admin_bp.route('/admin/logs/stats', methods=['GET'])
+def get_logs_stats():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    try:
+        stats = get_log_stats()
+        return jsonify({
+            'success': True,
+            'todayLogins': stats['today_logins'],
+            'todayActions': [{'action': a[0], 'count': a[1]} for a in stats['today_actions']]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# ===== 공지사항 관리 =====
+
+@admin_bp.route('/admin/notices', methods=['GET'])
+def get_notices_list():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    try:
+        rows = get_notices()
+        notices = []
+        for r in rows:
+            notices.append({
+                'id': r[0],
+                'title': r[1],
+                'content': r[2] or '',
+                'isPopup': r[3],
+                'isActive': r[4],
+                'createdAt': r[5].strftime('%Y-%m-%d %H:%M') if r[5] else ''
+            })
+        return jsonify({'success': True, 'notices': notices})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@admin_bp.route('/admin/notices', methods=['POST'])
+def create_notice_api():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    d = request.json
+    title = d.get('title', '').strip()
+    content = d.get('content', '').strip()
+    is_popup = d.get('isPopup', False)
+
+    if not title:
+        return jsonify({'success': False, 'message': '제목을 입력해주세요.'})
+
+    try:
+        notice_id = create_notice(title, content, is_popup)
+        return jsonify({'success': True, 'id': notice_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@admin_bp.route('/admin/notices/<int:notice_id>', methods=['PUT'])
+def update_notice_api(notice_id):
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    d = request.json
+    title = d.get('title', '').strip()
+    content = d.get('content', '').strip()
+    is_popup = d.get('isPopup', False)
+    is_active = d.get('isActive', True)
+
+    if not title:
+        return jsonify({'success': False, 'message': '제목을 입력해주세요.'})
+
+    try:
+        update_notice(notice_id, title, content, is_popup, is_active)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@admin_bp.route('/admin/notices/<int:notice_id>', methods=['DELETE'])
+def delete_notice_api(notice_id):
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'})
+
+    try:
+        delete_notice(notice_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# ===== 사용자용 공지사항 API (로그인 필요 없음) =====
+
+@admin_bp.route('/api/notices/popup', methods=['GET'])
+def get_popup_notices_api():
+    """팝업 공지사항 조회 (사용자용)"""
+    from utils.db import get_popup_notices
+    try:
+        rows = get_popup_notices()
+        notices = [{'id': r[0], 'title': r[1], 'content': r[2]} for r in rows]
+        return jsonify({'success': True, 'notices': notices})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@admin_bp.route('/api/notices', methods=['GET'])
+def get_active_notices_api():
+    """활성화된 공지사항 목록 (사용자용)"""
+    try:
+        rows = get_notices(active_only=True)
+        notices = []
+        for r in rows:
+            notices.append({
+                'id': r[0],
+                'title': r[1],
+                'content': r[2] or '',
+                'createdAt': r[5].strftime('%Y-%m-%d') if r[5] else ''
+            })
+        return jsonify({'success': True, 'notices': notices})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})

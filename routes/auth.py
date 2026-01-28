@@ -4,7 +4,7 @@ import urllib.request
 import urllib.parse
 import json
 
-from utils.db import get_db, get_user_withdrawals, create_withdrawal
+from utils.db import get_db, get_user_withdrawals, create_withdrawal, add_user_log
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -116,6 +116,10 @@ def api_login():
         session['name'] = u[2]
         session['role'] = u[4] or 'normal'
         session['terms_agreed'] = u[5] or False
+
+        # 로그인 로그 기록
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        add_user_log(d.get('userId'), 'login', None, ip_address)
 
         # 약관 미동의 시 약관 동의 페이지로 이동 필요
         need_terms = not (u[5] or False)

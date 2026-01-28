@@ -32,13 +32,15 @@
     </div>
 
     <!-- 탭 -->
-    <div role="tablist" class="tabs tabs-boxed mb-6">
-        <a role="tab" class="tab tab-active" id="tab-btn-users" onclick="showTab('users')">👥 회원 관리</a>
-        <a role="tab" class="tab" id="tab-btn-products" onclick="showTab('products')">📦 전체 상품</a>
+    <div role="tablist" class="tabs tabs-boxed mb-6 flex-wrap">
+        <a role="tab" class="tab tab-active" id="tab-btn-users" onclick="showTab('users')">👥 회원</a>
+        <a role="tab" class="tab" id="tab-btn-products" onclick="showTab('products')">📦 상품</a>
         <a role="tab" class="tab" id="tab-btn-withdrawals" onclick="showTab('withdrawals')">
-            💰 출금 관리
+            💰 출금
             <span id="withdrawalBadge" class="badge badge-error badge-sm ml-1 hidden">0</span>
         </a>
+        <a role="tab" class="tab" id="tab-btn-logs" onclick="showTab('logs')">📊 로그</a>
+        <a role="tab" class="tab" id="tab-btn-notices" onclick="showTab('notices')">📢 공지</a>
     </div>
 
     <!-- 회원 관리 탭 -->
@@ -133,27 +135,113 @@
             </div>
         </div>
     </div>
+
+    <!-- 로그 탭 -->
+    <div id="tab-logs" class="card bg-base-100 shadow-lg hidden">
+        <div class="card-body">
+            <!-- 오늘 통계 -->
+            <div id="logStats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"></div>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                <select id="logAction" class="select select-bordered select-sm">
+                    <option value="">전체 활동</option>
+                    <option value="login">로그인</option>
+                    <option value="product_score">상품지수</option>
+                    <option value="brand_sales">매출조회</option>
+                </select>
+                <input type="text" id="logUserId" placeholder="사용자 ID" class="input input-bordered input-sm w-32">
+                <button class="btn btn-primary btn-sm" onclick="loadLogs()">검색</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr>
+                            <th>시간</th>
+                            <th>사용자</th>
+                            <th>활동</th>
+                            <th>상세</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 공지사항 탭 -->
+    <div id="tab-notices" class="card bg-base-100 shadow-lg hidden">
+        <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold">공지사항 관리</h3>
+                <button class="btn btn-success btn-sm" onclick="showNoticeModal()">+ 새 공지</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr>
+                            <th>제목</th>
+                            <th>팝업</th>
+                            <th>상태</th>
+                            <th>등록일</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="noticeTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- 공지사항 모달 -->
+<dialog id="noticeModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4" id="noticeModalTitle">새 공지사항</h3>
+        <input type="hidden" id="noticeId">
+        <div class="form-control mb-3">
+            <label class="label"><span class="label-text">제목</span></label>
+            <input type="text" id="noticeTitle" class="input input-bordered" placeholder="공지 제목">
+        </div>
+        <div class="form-control mb-3">
+            <label class="label"><span class="label-text">내용</span></label>
+            <textarea id="noticeContent" class="textarea textarea-bordered h-32" placeholder="공지 내용"></textarea>
+        </div>
+        <div class="form-control mb-4">
+            <label class="label cursor-pointer justify-start gap-3">
+                <input type="checkbox" id="noticePopup" class="checkbox checkbox-primary">
+                <span class="label-text">팝업으로 표시</span>
+            </label>
+        </div>
+        <div class="modal-action">
+            <button class="btn btn-ghost" onclick="closeNoticeModal()">취소</button>
+            <button class="btn btn-primary" onclick="saveNotice()">저장</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <script>
 const FREE_LIMIT_MARKETING = 30;
 const FREE_LIMIT_DEFAULT = 3;
 
+const TABS = ['users', 'products', 'withdrawals', 'logs', 'notices'];
+
 function showTab(tab) {
     // 탭 버튼 스타일
-    document.getElementById('tab-btn-users').classList.remove('tab-active');
-    document.getElementById('tab-btn-products').classList.remove('tab-active');
-    document.getElementById('tab-btn-withdrawals').classList.remove('tab-active');
+    TABS.forEach(t => {
+        document.getElementById('tab-btn-' + t).classList.remove('tab-active');
+        document.getElementById('tab-' + t).classList.add('hidden');
+    });
     document.getElementById('tab-btn-' + tab).classList.add('tab-active');
-
-    // 탭 콘텐츠
-    document.getElementById('tab-users').classList.add('hidden');
-    document.getElementById('tab-products').classList.add('hidden');
-    document.getElementById('tab-withdrawals').classList.add('hidden');
     document.getElementById('tab-' + tab).classList.remove('hidden');
 
     if (tab === 'products') loadAllProducts();
     if (tab === 'withdrawals') loadWithdrawals();
+    if (tab === 'logs') { loadLogStats(); loadLogs(); }
+    if (tab === 'notices') loadNotices();
 }
 
 function getRoleBadge(role) {
@@ -481,6 +569,186 @@ async function processWithdrawal(id, status) {
 
 function formatNumber(n) {
     return (n || 0).toLocaleString();
+}
+
+// ===== 로그 관리 =====
+
+async function loadLogStats() {
+    try {
+        const r = await fetch('/admin/logs/stats');
+        const d = await r.json();
+        if (d.success) {
+            let actionsHtml = '';
+            d.todayActions.slice(0, 3).forEach(a => {
+                actionsHtml += `<div class="stat bg-base-100 rounded-lg shadow">
+                    <div class="stat-title">${getActionName(a.action)}</div>
+                    <div class="stat-value text-sm">${a.count}회</div>
+                </div>`;
+            });
+            document.getElementById('logStats').innerHTML = `
+                <div class="stat bg-base-100 rounded-lg shadow">
+                    <div class="stat-title">오늘 방문자</div>
+                    <div class="stat-value text-primary">${d.todayLogins}</div>
+                </div>
+                ${actionsHtml}`;
+        }
+    } catch(e) {}
+}
+
+function getActionName(action) {
+    const names = {
+        'login': '로그인',
+        'product_score': '상품지수',
+        'brand_sales': '매출조회'
+    };
+    return names[action] || action;
+}
+
+async function loadLogs() {
+    try {
+        const action = document.getElementById('logAction').value;
+        const userId = document.getElementById('logUserId').value;
+        const r = await fetch(`/admin/logs?action=${action}&user_id=${userId}&limit=100`);
+        const d = await r.json();
+
+        if (d.success) {
+            const tbody = document.getElementById('logTable');
+            tbody.innerHTML = '';
+
+            d.logs.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-xs">${l.createdAt}</td>
+                    <td>${l.userName} (${l.userId})</td>
+                    <td><span class="badge badge-ghost badge-sm">${getActionName(l.action)}</span></td>
+                    <td class="text-xs">${l.detail || '-'}</td>
+                    <td class="text-xs">${l.ipAddress || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (d.logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-10 text-base-content/60">로그가 없습니다.</td></tr>';
+            }
+        }
+    } catch(e) {
+        alert('로그 로드 실패');
+    }
+}
+
+// ===== 공지사항 관리 =====
+
+async function loadNotices() {
+    try {
+        const r = await fetch('/admin/notices');
+        const d = await r.json();
+
+        if (d.success) {
+            const tbody = document.getElementById('noticeTable');
+            tbody.innerHTML = '';
+
+            d.notices.forEach(n => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${n.title}</td>
+                    <td>${n.isPopup ? '<span class="badge badge-primary badge-sm">팝업</span>' : '-'}</td>
+                    <td>${n.isActive ? '<span class="badge badge-success badge-sm">활성</span>' : '<span class="badge badge-ghost badge-sm">비활성</span>'}</td>
+                    <td>${n.createdAt}</td>
+                    <td>
+                        <button class="btn btn-ghost btn-xs" onclick="editNotice(${n.id})">수정</button>
+                        <button class="btn btn-error btn-xs" onclick="deleteNoticeConfirm(${n.id})">삭제</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (d.notices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-10 text-base-content/60">공지사항이 없습니다.</td></tr>';
+            }
+        }
+    } catch(e) {
+        alert('공지 로드 실패');
+    }
+}
+
+let noticesCache = [];
+
+function showNoticeModal(notice = null) {
+    document.getElementById('noticeId').value = notice ? notice.id : '';
+    document.getElementById('noticeTitle').value = notice ? notice.title : '';
+    document.getElementById('noticeContent').value = notice ? notice.content : '';
+    document.getElementById('noticePopup').checked = notice ? notice.isPopup : false;
+    document.getElementById('noticeModalTitle').textContent = notice ? '공지사항 수정' : '새 공지사항';
+    document.getElementById('noticeModal').showModal();
+}
+
+function closeNoticeModal() {
+    document.getElementById('noticeModal').close();
+}
+
+async function editNotice(id) {
+    try {
+        const r = await fetch('/admin/notices');
+        const d = await r.json();
+        if (d.success) {
+            const notice = d.notices.find(n => n.id === id);
+            if (notice) showNoticeModal(notice);
+        }
+    } catch(e) {}
+}
+
+async function saveNotice() {
+    const id = document.getElementById('noticeId').value;
+    const title = document.getElementById('noticeTitle').value.trim();
+    const content = document.getElementById('noticeContent').value.trim();
+    const isPopup = document.getElementById('noticePopup').checked;
+
+    if (!title) {
+        alert('제목을 입력해주세요.');
+        return;
+    }
+
+    try {
+        let r;
+        if (id) {
+            r = await fetch(`/admin/notices/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, content, isPopup, isActive: true})
+            });
+        } else {
+            r = await fetch('/admin/notices', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, content, isPopup})
+            });
+        }
+        const d = await r.json();
+        if (d.success) {
+            closeNoticeModal();
+            loadNotices();
+        } else {
+            alert(d.message || '저장 실패');
+        }
+    } catch(e) {
+        alert('저장 실패');
+    }
+}
+
+async function deleteNoticeConfirm(id) {
+    if (!confirm('이 공지사항을 삭제하시겠습니까?')) return;
+
+    try {
+        const r = await fetch(`/admin/notices/${id}`, {method: 'DELETE'});
+        const d = await r.json();
+        if (d.success) {
+            loadNotices();
+        } else {
+            alert(d.message || '삭제 실패');
+        }
+    } catch(e) {
+        alert('삭제 실패');
+    }
 }
 
 loadStats();
