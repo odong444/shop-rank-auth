@@ -390,10 +390,13 @@ def delete_notice(notice_id):
 
 
 def get_popup_notices():
-    """팝업 공지사항 조회 (활성화된 것만)"""
+    """팝업 공지사항 조회 (활성화되고 제목이 있는 것만)"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('SELECT id, title, content FROM notices WHERE is_popup = TRUE AND is_active = TRUE ORDER BY created_at DESC')
+    cur.execute('''SELECT id, title, content FROM notices
+                   WHERE is_popup = TRUE AND is_active = TRUE
+                   AND title IS NOT NULL AND TRIM(title) != ''
+                   ORDER BY created_at DESC''')
     rows = cur.fetchall()
     cur.close()
     conn.close()
