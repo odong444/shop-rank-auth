@@ -391,12 +391,6 @@
             </svg>
             <span>브랜드매출</span>
         </a>
-        <a href="/withdrawal" class="nav-item {% if active_menu == 'withdrawal' %}active{% endif %}">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            <span>출금</span>
-        </a>
         {% if session.role == 'admin' %}
         <a href="/admin" class="nav-item {% if active_menu == 'admin' %}active{% endif %}">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -440,10 +434,13 @@ async function checkNoticePopup() {
         const d = await r.json();
         if (d.success && d.notices.length > 0) {
             const notice = d.notices[0];
-            document.getElementById('noticePopupTitle').textContent = '📢 ' + notice.title;
-            document.getElementById('noticePopupContent').textContent = notice.content;
-            document.getElementById('noticePopupOverlay').classList.remove('hidden');
-            document.getElementById('noticePopupOverlay').style.display = 'flex';
+            // 제목이나 내용이 있을 때만 팝업 표시
+            if (notice.title || notice.content) {
+                document.getElementById('noticePopupTitle').textContent = '📢 ' + (notice.title || '공지사항');
+                document.getElementById('noticePopupContent').textContent = notice.content || '';
+                document.getElementById('noticePopupOverlay').classList.remove('hidden');
+                document.getElementById('noticePopupOverlay').style.display = 'flex';
+            }
         }
     } catch(e) {}
 }

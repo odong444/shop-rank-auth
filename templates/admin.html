@@ -35,10 +35,6 @@
     <div role="tablist" class="tabs tabs-boxed mb-6 flex-wrap">
         <a role="tab" class="tab tab-active" id="tab-btn-users" onclick="showTab('users')">👥 회원</a>
         <a role="tab" class="tab" id="tab-btn-products" onclick="showTab('products')">📦 상품</a>
-        <a role="tab" class="tab" id="tab-btn-withdrawals" onclick="showTab('withdrawals')">
-            💰 출금
-            <span id="withdrawalBadge" class="badge badge-error badge-sm ml-1 hidden">0</span>
-        </a>
         <a role="tab" class="tab" id="tab-btn-logs" onclick="showTab('logs')">📊 로그</a>
         <a role="tab" class="tab" id="tab-btn-notices" onclick="showTab('notices')">📢 공지</a>
     </div>
@@ -102,35 +98,6 @@
                         </tr>
                     </thead>
                     <tbody id="productTable"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- 출금 관리 탭 -->
-    <div id="tab-withdrawals" class="card bg-base-100 shadow-lg hidden">
-        <div class="card-body">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold">출금 요청 목록</h3>
-                <button class="btn btn-primary btn-sm" onclick="loadWithdrawals()">새로고침</button>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="table table-zebra table-sm">
-                    <thead>
-                        <tr>
-                            <th>요청일</th>
-                            <th>사용자</th>
-                            <th>금액</th>
-                            <th>은행</th>
-                            <th>계좌번호</th>
-                            <th>예금주</th>
-                            <th>상태</th>
-                            <th>처리일</th>
-                            <th>관리</th>
-                        </tr>
-                    </thead>
-                    <tbody id="withdrawalTable"></tbody>
                 </table>
             </div>
         </div>
@@ -227,7 +194,7 @@
 const FREE_LIMIT_MARKETING = 30;
 const FREE_LIMIT_DEFAULT = 3;
 
-const TABS = ['users', 'products', 'withdrawals', 'logs', 'notices'];
+const TABS = ['users', 'products', 'logs', 'notices'];
 
 function showTab(tab) {
     // 탭 버튼 스타일
@@ -239,7 +206,6 @@ function showTab(tab) {
     document.getElementById('tab-' + tab).classList.remove('hidden');
 
     if (tab === 'products') loadAllProducts();
-    if (tab === 'withdrawals') loadWithdrawals();
     if (tab === 'logs') { loadLogStats(); loadLogs(); }
     if (tab === 'notices') loadNotices();
 }
@@ -475,102 +441,6 @@ document.getElementById('searchKeyword').addEventListener('keypress', e => {
     if (e.key === 'Enter') loadAllProducts();
 });
 
-// ===== 출금 관리 =====
-
-async function loadPendingCount() {
-    try {
-        const r = await fetch('/admin/withdrawals/pending-count');
-        const d = await r.json();
-        if (d.success) {
-            const badge = document.getElementById('withdrawalBadge');
-            if (d.count > 0) {
-                badge.textContent = d.count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-    } catch(e) {}
-}
-
-async function loadWithdrawals() {
-    try {
-        const r = await fetch('/admin/withdrawals');
-        const d = await r.json();
-        if (d.success) {
-            const tbody = document.getElementById('withdrawalTable');
-            tbody.innerHTML = '';
-
-            d.withdrawals.forEach(w => {
-                const tr = document.createElement('tr');
-                const statusBadge = getStatusBadge(w.status);
-                const actionBtns = w.status === 'pending' ? `
-                    <button class="btn btn-success btn-xs" onclick="processWithdrawal(${w.id}, 'approved')">승인</button>
-                    <button class="btn btn-error btn-xs" onclick="processWithdrawal(${w.id}, 'rejected')">거절</button>
-                ` : '-';
-
-                tr.innerHTML = `
-                    <td>${w.requestedAt}</td>
-                    <td>${w.userName} (${w.userId})</td>
-                    <td class="font-bold">${formatNumber(w.amount)}원</td>
-                    <td>${w.bankName}</td>
-                    <td>${w.accountNumber}</td>
-                    <td>${w.accountHolder}</td>
-                    <td>${statusBadge}</td>
-                    <td>${w.processedAt || '-'}</td>
-                    <td>${actionBtns}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            if (d.withdrawals.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-10 text-base-content/60">출금 요청이 없습니다.</td></tr>';
-            }
-
-            loadPendingCount();
-        }
-    } catch(e) {
-        alert('출금 목록 로드 실패');
-    }
-}
-
-function getStatusBadge(status) {
-    const badges = {
-        pending: '<span class="badge badge-warning badge-sm">대기중</span>',
-        approved: '<span class="badge badge-success badge-sm">승인</span>',
-        rejected: '<span class="badge badge-error badge-sm">거절</span>'
-    };
-    return badges[status] || status;
-}
-
-async function processWithdrawal(id, status) {
-    const statusText = status === 'approved' ? '승인' : '거절';
-    const memo = status === 'rejected' ? prompt('거절 사유를 입력하세요 (선택사항):') : '';
-
-    if (!confirm(`이 출금 요청을 ${statusText}하시겠습니까?`)) return;
-
-    try {
-        const r = await fetch('/admin/withdrawals/process', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id: id, status: status, memo: memo || ''})
-        });
-        const d = await r.json();
-        if (d.success) {
-            alert(`${statusText} 완료`);
-            loadWithdrawals();
-        } else {
-            alert(d.message || '처리 실패');
-        }
-    } catch(e) {
-        alert('처리 실패');
-    }
-}
-
-function formatNumber(n) {
-    return (n || 0).toLocaleString();
-}
-
 // ===== 로그 관리 =====
 
 async function loadLogStats() {
@@ -753,7 +623,6 @@ async function deleteNoticeConfirm(id) {
 
 loadStats();
 loadUsers();
-loadPendingCount();
 </script>
 </body>
 </html>
