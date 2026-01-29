@@ -115,6 +115,8 @@
                     <option value="login">로그인</option>
                     <option value="product_score">상품지수</option>
                     <option value="brand_sales">매출조회</option>
+                    <option value="coupang_search">쿠팡순위</option>
+                    <option value="coupang_sales">쿠팡매출</option>
                 </select>
                 <input type="text" id="logUserId" placeholder="사용자 ID" class="input input-bordered input-sm w-32">
                 <button class="btn btn-primary btn-sm" onclick="loadLogs()">검색</button>
@@ -193,6 +195,7 @@
 <script>
 const FREE_LIMIT_MARKETING = 30;
 const FREE_LIMIT_DEFAULT = 3;
+const COUPANG_SALES_LIMIT = 1;
 
 const TABS = ['users', 'products', 'logs', 'notices'];
 
@@ -229,7 +232,7 @@ function getRoleSelect(userId, currentRole) {
     `;
 }
 
-function getUsageDisplay(role, productScoreUsed, brandSalesUsed, marketingAgreed) {
+function getUsageDisplay(role, productScoreUsed, brandSalesUsed, marketingAgreed, coupangSalesUsed = 0) {
     if (role === 'customer' || role === 'admin') {
         return '<span class="badge badge-success badge-sm">무제한</span>';
     }
@@ -237,6 +240,7 @@ function getUsageDisplay(role, productScoreUsed, brandSalesUsed, marketingAgreed
     const limit = marketingAgreed ? FREE_LIMIT_MARKETING : FREE_LIMIT_DEFAULT;
     const psClass = productScoreUsed >= limit ? 'text-error' : 'text-success';
     const bsClass = brandSalesUsed >= limit ? 'text-error' : 'text-success';
+    const csClass = coupangSalesUsed >= COUPANG_SALES_LIMIT ? 'text-error' : 'text-success';
     const marketingBadge = marketingAgreed
         ? '<span class="badge badge-success badge-xs">마케팅O</span>'
         : '<span class="badge badge-ghost badge-xs">마케팅X</span>';
@@ -246,6 +250,7 @@ function getUsageDisplay(role, productScoreUsed, brandSalesUsed, marketingAgreed
             <div>${marketingBadge}</div>
             <div>상품지수: <span class="${psClass} font-bold">${productScoreUsed}/${limit}</span></div>
             <div>매출조회: <span class="${bsClass} font-bold">${brandSalesUsed}/${limit}</span></div>
+            <div>쿠팡매출: <span class="${csClass} font-bold">${coupangSalesUsed}/${COUPANG_SALES_LIMIT}</span></div>
         </div>
     `;
 }
@@ -297,7 +302,7 @@ async function loadUsers() {
                     <td>${u.regDate}</td>
                     <td>${u.productCount || 0}개</td>
                     <td>${getRoleSelect(u.userId, role)}</td>
-                    <td>${getUsageDisplay(role, u.productScoreUsed || 0, u.brandSalesUsed || 0, u.marketingAgreed)}</td>
+                    <td>${getUsageDisplay(role, u.productScoreUsed || 0, u.brandSalesUsed || 0, u.marketingAgreed, u.coupangSalesUsed || 0)}</td>
                     <td>
                         ${u.approved === 'Y'
                             ? '<span class="badge badge-success badge-sm">승인됨</span>'
@@ -469,7 +474,9 @@ function getActionName(action) {
     const names = {
         'login': '로그인',
         'product_score': '상품지수',
-        'brand_sales': '매출조회'
+        'brand_sales': '매출조회',
+        'coupang_search': '쿠팡순위',
+        'coupang_sales': '쿠팡매출'
     };
     return names[action] || action;
 }

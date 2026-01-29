@@ -38,7 +38,7 @@ def get_users():
         cur = conn.cursor()
         cur.execute('''SELECT u.id, u.user_id, u.name, u.phone, u.reg_date, u.approved, u.role,
                       (SELECT COUNT(*) FROM products p WHERE p.user_id = u.user_id) as product_count,
-                      u.product_score_used, u.brand_sales_used, u.marketing_agreed
+                      u.product_score_used, u.brand_sales_used, u.marketing_agreed, u.coupang_sales_used
                       FROM users u ORDER BY u.id DESC''')
         rows = cur.fetchall()
         cur.close()
@@ -50,7 +50,7 @@ def get_users():
                 'regDate': str(r[4]) if r[4] else '', 'approved': r[5],
                 'role': r[6] or 'normal', 'productCount': r[7],
                 'productScoreUsed': r[8] or 0, 'brandSalesUsed': r[9] or 0,
-                'marketingAgreed': r[10] or False
+                'marketingAgreed': r[10] or False, 'coupangSalesUsed': r[11] or 0
             } for r in rows]
         })
     except Exception as e:

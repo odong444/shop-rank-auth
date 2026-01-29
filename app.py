@@ -13,6 +13,7 @@ from routes.dashboard import dashboard_bp
 from routes.product_score import product_score_bp
 from routes.brand_sales import brand_sales_bp
 from routes.admin import admin_bp
+from routes.coupang import coupang_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
@@ -24,6 +25,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(product_score_bp)
 app.register_blueprint(brand_sales_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(coupang_bp)
 
 
 @app.route('/')
