@@ -158,9 +158,29 @@ input[type="checkbox"] {
     border-radius: 12px;
     padding: 20px;
     width: 90%;
-    max-width: 400px;
+    max-width: 360px;
     max-height: 80vh;
     overflow-y: auto;
+    overflow-x: hidden;
+}
+.modal-box .data-table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+}
+.modal-box .data-table th,
+.modal-box .data-table td {
+    padding: 10px 8px;
+    text-align: center;
+    word-break: break-all;
+}
+.modal-box .data-table th:first-child,
+.modal-box .data-table td:first-child {
+    width: 65%;
+}
+.modal-box .data-table th:last-child,
+.modal-box .data-table td:last-child {
+    width: 35%;
 }
 .modal-title {
     font-size: 1rem;
