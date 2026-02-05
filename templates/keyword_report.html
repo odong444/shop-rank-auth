@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}키워드 분석 보고서{% endblock %}
+{% block header_title %}📝 키워드 분석 보고서{% endblock %}
+
+{% block header_right %}
+<span id="serverStatus" class="server-status offline">● 서버 확인중</span>
+<span style="font-size:14px;color:#666">👤 {{ session.name }}님</span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+@media (max-width: 900px) { .analysis-grid { grid-template-columns: 1fr; } }
+
+.stat-box { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+.stat-box .value { font-size: 24px; font-weight: bold; color: #667eea; }
+.stat-box .label { font-size: 12px; color: #888; margin-top: 5px; }
+
+.keyword-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.keyword-table th, .keyword-table td { padding: 8px 10px; border: 1px solid #e0e0e0; text-align: left; }
+.keyword-table th { background: #f5f5f5; font-weight: 600; }
+.keyword-table tr:hover { background: #fafafa; }
+
+.ai-box { background: linear-gradient(135deg, #667eea20, #764ba220); border: 1px solid #667eea40; border-radius: 8px; padding: 20px; margin-top: 15px; }
+.ai-box h4 { color: #667eea; margin-bottom: 15px; }
+.ai-tag { display: inline-block; background: #667eea; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; }
+
+.strategy-card { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 10px; }
+.strategy-card h5 { color: #333; margin-bottom: 10px; font-size: 14px; }
+.strategy-card p { color: #666; font-size: 13px; line-height: 1.6; }
+
+.difficulty-high { color: #e74c3c; font-weight: bold; }
+.difficulty-mid { color: #f39c12; font-weight: bold; }
+.difficulty-low { color: #27ae60; font-weight: bold; }
+
+.progress-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eee; }
+.progress-step .step-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.progress-step .step-icon.done { background: #27ae60; color: white; }
+.progress-step .step-icon.loading { background: #667eea; color: white; animation: pulse 1s infinite; }
+.progress-step .step-icon.pending { background: #ddd; color: #888; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.checkbox-option { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.checkbox-option input[type="checkbox"] { width: 18px; height: 18px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header"><h3>🔍 키워드 분석</h3></div>
+    <div class="card-body">
+        <div class="search-box">
+            <input type="text" id="mainKeyword" placeholder="분석할 메인 키워드를 입력하세요 (예: 사과, 물티슈)" style="flex:1">
+            <button onclick="analyzeKeyword()" id="analyzeBtn">분석 시작</button>
+        </div>
+        <div class="checkbox-option">
+            <input type="checkbox" id="includeAI" checked>
+            <label for="includeAI">🤖 AI 서브키워드 분석 포함 (Claude API 사용)</label>
+        </div>
+        <p style="margin-top:10px;font-size:12px;color:#888">* AI 분석 포함 시 더 정확한 서브키워드 추천과 전략을 제공합니다</p>
+    </div>
+</div>
+
+<!-- 진행 상황 -->
+<div class="card" id="progressCard" style="display:none">
+    <div class="card-header"><h3>⏳ 분석 진행 중...</h3></div>
+    <div class="card-body">
+        <div id="progressSteps">
+            <div class="progress-step" data-step="1">
+                <div class="step-icon pending">1</div>
+                <span>검색량 및 연관 키워드 조회</span>
+            </div>
+            <div class="progress-step" data-step="2">
+                <div class="step-icon pending">2</div>
+                <span>콘텐츠 및 상품 데이터 수집</span>
+            </div>
+            <div class="progress-step" data-step="3">
+                <div class="step-icon pending">3</div>
+                <span>상품지수 및 매출 조회</span>
+            </div>
+            <div class="progress-step" data-step="4">
+                <div class="step-icon pending">4</div>
+                <span>AI 서브키워드 분석</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 분석 결과 -->
+<div id="resultSection" style="display:none">
+    <!-- 기본 정보 -->
+    <div class="card">
+        <div class="card-header"><h3>📊 <span id="resultKeyword"></span> 분석 결과</h3></div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px">
+                <div class="stat-box">
+                    <div class="value" id="totalVolume">-</div>
+                    <div class="label">월간 검색량</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="pcVolume">-</div>
+                    <div class="label">PC 검색량</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="mobileVolume">-</div>
+                    <div class="label">모바일 검색량</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="competition">-</div>
+                    <div class="label">경쟁 강도</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="productCount">-</div>
+                    <div class="label">등록 상품 수</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="analysis-grid">
+        <!-- 연관 키워드 -->
+        <div class="card">
+            <div class="card-header"><h3>🔗 연관 키워드 TOP 10</h3></div>
+            <div class="card-body">
+                <table class="keyword-table">
+                    <thead><tr><th>#</th><th>키워드</th><th>검색량</th><th>경쟁</th></tr></thead>
+                    <tbody id="relatedKeywords"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 상위 매출 -->
+        <div class="card">
+            <div class="card-header"><h3>💰 상위 스토어 월간 매출</h3></div>
+            <div class="card-body">
+                <table class="keyword-table">
+                    <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th></tr></thead>
+                    <tbody id="topSales"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 분석 결과 -->
+    <div class="card" id="aiResultCard" style="display:none">
+        <div class="card-header"><h3>🤖 AI 서브키워드 분석</h3></div>
+        <div class="card-body">
+            <div class="ai-box">
+                <h4><span class="ai-tag">AI</span> 추천 서브키워드</h4>
+                <table class="keyword-table">
+                    <thead><tr><th>키워드</th><th>검색량</th><th>상품수</th><th>상위매출</th><th>진입난이도</th><th>추천이유</th></tr></thead>
+                    <tbody id="aiKeywords"></tbody>
+                </table>
+            </div>
+
+            <div class="strategy-card" id="strategyCard">
+                <h5>📋 전략 제안</h5>
+                <div id="strategyContent"></div>
+            </div>
+
+            <div class="ai-box" style="margin-top:20px" id="aiSummaryBox">
+                <h4><span class="ai-tag">AI</span> 종합 분석</h4>
+                <div id="aiSummary" style="white-space:pre-wrap;line-height:1.8"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const RANK_API_URL = '{{ rank_api_url }}';
+
+async function checkServer() {
+    const status = document.getElementById('serverStatus');
+    try {
+        const r = await fetch(RANK_API_URL + '/health', {method: 'GET', mode: 'cors'});
+        if (r.ok) {
+            status.className = 'server-status online';
+            status.textContent = '● 서버 연결됨';
+            return true;
+        }
+    } catch(e) {}
+    status.className = 'server-status offline';
+    status.textContent = '● 서버 오프라인';
+    return false;
+}
+
+function updateProgress(step, status) {
+    const stepEl = document.querySelector(`[data-step="${step}"] .step-icon`);
+    if (stepEl) {
+        stepEl.className = 'step-icon ' + status;
+        if (status === 'done') stepEl.textContent = '✓';
+    }
+}
+
+function formatNumber(num) {
+    if (!num) return '-';
+    return parseInt(num).toLocaleString();
+}
+
+async function analyzeKeyword() {
+    const keyword = document.getElementById('mainKeyword').value.trim();
+    const includeAI = document.getElementById('includeAI').checked;
+    const btn = document.getElementById('analyzeBtn');
+
+    if (!keyword) {
+        alert('키워드를 입력해주세요.');
+        return;
+    }
+
+    // UI 초기화
+    btn.disabled = true;
+    btn.textContent = '분석 중...';
+    document.getElementById('progressCard').style.display = 'block';
+    document.getElementById('resultSection').style.display = 'none';
+
+    // 진행 상태 초기화
+    for (let i = 1; i <= 4; i++) {
+        const stepEl = document.querySelector(`[data-step="${i}"] .step-icon`);
+        stepEl.className = 'step-icon pending';
+        stepEl.textContent = i;
+    }
+
+    // 4단계는 AI 미포함시 숨김
+    document.querySelector('[data-step="4"]').style.display = includeAI ? 'flex' : 'none';
+
+    try {
+        updateProgress(1, 'loading');
+
+        const response = await fetch('/api/keyword-report/analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({keyword, include_ai: includeAI})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 진행 완료 표시
+            for (let i = 1; i <= (includeAI ? 4 : 3); i++) {
+                updateProgress(i, 'done');
+            }
+
+            renderResults(result.data);
+        } else {
+            alert('분석 실패: ' + (result.error || '알 수 없는 오류'));
+        }
+    } catch(e) {
+        console.error(e);
+        alert('분석 중 오류가 발생했습니다.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '분석 시작';
+    }
+}
+
+function renderResults(data) {
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('resultKeyword').textContent = data.keyword;
+
+    // 기본 정보
+    const sv = data.search_volume || {};
+    document.getElementById('totalVolume').textContent = formatNumber(sv.total);
+    document.getElementById('pcVolume').textContent = formatNumber(sv.pc);
+    document.getElementById('mobileVolume').textContent = formatNumber(sv.mobile);
+    document.getElementById('competition').textContent = sv.competition || '-';
+    document.getElementById('productCount').textContent = formatNumber(data.content_counts?.shop);
+
+    // 연관 키워드
+    const relatedTbody = document.getElementById('relatedKeywords');
+    relatedTbody.innerHTML = '';
+    (data.related_keywords || []).slice(0, 10).forEach((kw, i) => {
+        relatedTbody.innerHTML += `<tr>
+            <td>${i+1}</td>
+            <td>${kw.keyword}</td>
+            <td>${formatNumber(kw.volume)}</td>
+            <td>${kw.competition}</td>
+        </tr>`;
+    });
+
+    // 상위 매출
+    const salesTbody = document.getElementById('topSales');
+    salesTbody.innerHTML = '';
+    (data.monthly_sales || []).forEach((s, i) => {
+        salesTbody.innerHTML += `<tr>
+            <td>${i+1}</td>
+            <td>${s.mall}</td>
+            <td>${formatNumber(s.total_amount)}원</td>
+        </tr>`;
+    });
+    if (!data.monthly_sales?.length) {
+        salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888">매출 데이터 없음</td></tr>';
+    }
+
+    // AI 분석 결과
+    const aiCard = document.getElementById('aiResultCard');
+    if (data.sub_keyword_analysis) {
+        aiCard.style.display = 'block';
+
+        const analysis = data.sub_keyword_analysis;
+        const aiTbody = document.getElementById('aiKeywords');
+        aiTbody.innerHTML = '';
+
+        (analysis.recommended_keywords || []).forEach(kw => {
+            const diffClass = kw.entry_difficulty === '상' ? 'difficulty-high' :
+                             (kw.entry_difficulty === '중' ? 'difficulty-mid' : 'difficulty-low');
+            aiTbody.innerHTML += `<tr>
+                <td><strong>${kw.keyword}</strong></td>
+                <td>${formatNumber(kw.search_volume)}</td>
+                <td>${formatNumber(kw.product_count)}</td>
+                <td>${formatNumber(kw.top_monthly_sales)}원</td>
+                <td class="${diffClass}">${kw.entry_difficulty}</td>
+                <td style="font-size:12px">${kw.reason}</td>
+            </tr>`;
+        });
+
+        // 전략 제안
+        const strategy = analysis.strategy || {};
+        document.getElementById('strategyContent').innerHTML = `
+            <p><strong>🎯 우선 공략 키워드:</strong> ${strategy.priority_keyword || '-'}</p>
+            <p style="margin-top:8px;color:#666">${strategy.priority_reason || ''}</p>
+            <hr style="margin:15px 0;border:none;border-top:1px solid #eee">
+            <p><strong>메인 키워드 활용:</strong> ${strategy.main_keyword_usage || '-'}</p>
+            <p style="margin-top:8px"><strong>서브 키워드 활용:</strong> ${strategy.sub_keyword_usage || '-'}</p>
+        `;
+
+        // AI 요약
+        if (data.ai_summary) {
+            document.getElementById('aiSummary').textContent = data.ai_summary;
+            document.getElementById('aiSummaryBox').style.display = 'block';
+        } else {
+            document.getElementById('aiSummaryBox').style.display = 'none';
+        }
+    } else {
+        aiCard.style.display = 'none';
+    }
+
+    // 결과 영역으로 스크롤
+    document.getElementById('resultSection').scrollIntoView({behavior: 'smooth'});
+}
+
+document.getElementById('mainKeyword').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') analyzeKeyword();
+});
+
+checkServer();
+setInterval(checkServer, 30000);
+</script>
+{% endblock %}

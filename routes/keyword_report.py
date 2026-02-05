@@ -1,0 +1,422 @@
+"""
+키워드 분석 보고서 API
+- 메인 키워드 분석
+- 서브키워드 추출 및 분석
+- AI 전략 제안
+"""
+from flask import Blueprint, request, jsonify, session, redirect, render_template
+from functools import wraps
+import requests
+import hashlib
+import hmac
+import base64
+import time
+import os
+import json
+
+from utils.claude_api import analyze_sub_keywords, generate_report_summary
+
+keyword_report_bp = Blueprint('keyword_report', __name__)
+
+# ========== API 설정 ==========
+CUSTOMER_ID = os.environ.get('NAVER_AD_CUSTOMER_ID', '2453515')
+AD_API_KEY = os.environ.get('NAVER_AD_API_KEY', '01000000006162454519ef4e8d97852a2ad5eb9b397beef455f126cace2f790f5c6b7bccff')
+AD_SECRET_KEY = os.environ.get('NAVER_AD_SECRET_KEY', 'AQAAAABhYkVFGe9OjZeFKirV65s5Ke25zkTefku4HBEbYMqJ+Q==')
+AD_BASE_URL = 'https://api.naver.com'
+
+NAVER_CLIENT_ID = os.environ.get('NAVER_CLIENT_ID', 'UrlniCJoGZ_jfgk5tlkN')
+NAVER_CLIENT_SECRET = os.environ.get('NAVER_CLIENT_SECRET', 'x3z9b1CM2F')
+
+# 로컬 API 서버 (매출 조회용)
+RANK_API_URL = os.environ.get('RANK_API_URL', 'https://api.bw-rank.kr')
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ========== 네이버 광고 API ==========
+def generate_signature(timestamp, method, uri):
+    message = f"{timestamp}.{method}.{uri}"
+    signature = hmac.new(
+        AD_SECRET_KEY.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256
+    ).digest()
+    return base64.b64encode(signature).decode('utf-8')
+
+
+def get_ad_header(method, uri):
+    timestamp = str(int(time.time() * 1000))
+    signature = generate_signature(timestamp, method, uri)
+    return {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Timestamp': timestamp,
+        'X-API-KEY': AD_API_KEY,
+        'X-Customer': CUSTOMER_ID,
+        'X-Signature': signature
+    }
+
+
+def get_keyword_stats(keyword):
+    """네이버 광고 API - 키워드 검색량 조회"""
+    uri = '/keywordstool'
+    method = 'GET'
+    params = {'hintKeywords': keyword, 'showDetail': '1'}
+    headers = get_ad_header(method, uri)
+    try:
+        response = requests.get(AD_BASE_URL + uri, headers=headers, params=params, timeout=30)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Keyword stats error: {e}")
+    return None
+
+
+# ========== 네이버 검색 API ==========
+def get_content_counts(keyword):
+    """블로그, 카페, 쇼핑 콘텐츠 수 조회"""
+    results = {}
+    for search_type, api_type in [('blog', 'blog'), ('cafe', 'cafearticle'), ('shop', 'shop')]:
+        url = f"https://openapi.naver.com/v1/search/{api_type}.json"
+        headers = {
+            "X-Naver-Client-Id": NAVER_CLIENT_ID,
+            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+        }
+        try:
+            response = requests.get(url, headers=headers, params={"query": keyword, "display": 1}, timeout=10)
+            if response.status_code == 200:
+                results[search_type] = response.json().get('total', 0)
+            else:
+                results[search_type] = 0
+        except:
+            results[search_type] = 0
+    return results
+
+
+def get_shopping_top_products(keyword, count=10):
+    """쇼핑 상위 상품 조회"""
+    url = "https://openapi.naver.com/v1/search/shop.json"
+    headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+    }
+    params = {"query": keyword, "display": count, "sort": "sim"}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            products = []
+            for idx, item in enumerate(data.get('items', []), 1):
+                products.append({
+                    'rank': idx,
+                    'title': item.get('title', '').replace('<b>', '').replace('</b>', ''),
+                    'mall': item.get('mallName', ''),
+                    'price': int(item.get('lprice', '0')),
+                    'link': item.get('link', '')
+                })
+            return products
+    except Exception as e:
+        print(f"Shopping search error: {e}")
+    return []
+
+
+# ========== 로컬 API 서버 호출 ==========
+def get_product_score(keyword):
+    """상품지수 조회 (로컬 API)"""
+    try:
+        url = f"{RANK_API_URL}/api/product-score?keyword={requests.utils.quote(keyword)}"
+        response = requests.get(url, timeout=60)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Product score error: {e}")
+    return None
+
+
+def get_brand_sales(mall_seq, period='monthly'):
+    """브랜드 매출 조회 (로컬 API)"""
+    try:
+        url = f"{RANK_API_URL}/api/brand-sales?mall_seq={mall_seq}&period={period}"
+        response = requests.get(url, timeout=60)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Brand sales error: {e}")
+    return None
+
+
+# ========== 유틸 함수 ==========
+def parse_count(value):
+    if isinstance(value, str) and '<' in value:
+        return 5
+    try:
+        return int(value)
+    except:
+        return 0
+
+
+def format_number(num):
+    try:
+        return f"{int(num):,}"
+    except:
+        return str(num)
+
+
+# ========== API 라우트 ==========
+
+@keyword_report_bp.route('/keyword-report')
+@login_required
+def keyword_report_page():
+    """키워드 보고서 페이지"""
+    return render_template('keyword_report.html',
+                           active_menu='keyword-report',
+                           rank_api_url=RANK_API_URL)
+
+
+@keyword_report_bp.route('/api/keyword-report/analyze', methods=['POST'])
+@login_required
+def analyze_keyword():
+    """
+    키워드 분석 API
+
+    Request Body:
+    {
+        "keyword": "메인 키워드",
+        "include_ai": true/false (AI 분석 포함 여부)
+    }
+
+    Response:
+    {
+        "success": true,
+        "data": {
+            "keyword": "메인 키워드",
+            "search_volume": {...},
+            "content_counts": {...},
+            "related_keywords": [...],
+            "top_products": [...],
+            "sub_keyword_analysis": {...}  // AI 분석 결과
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        keyword = data.get('keyword', '').strip()
+        include_ai = data.get('include_ai', True)
+
+        if not keyword:
+            return jsonify({"success": False, "error": "키워드를 입력하세요."}), 400
+
+        result = {
+            "keyword": keyword,
+            "search_volume": {},
+            "content_counts": {},
+            "related_keywords": [],
+            "top_products": [],
+            "product_scores": [],
+            "monthly_sales": [],
+            "sub_keyword_analysis": None,
+            "ai_summary": None
+        }
+
+        # 1. 검색량 + 연관 키워드
+        stats = get_keyword_stats(keyword)
+        if stats and 'keywordList' in stats:
+            keywords_list = stats['keywordList']
+
+            # 메인 키워드 검색량
+            main_kw = next((kw for kw in keywords_list if kw.get('relKeyword', '').strip() == keyword.strip()),
+                          keywords_list[0] if keywords_list else None)
+            if main_kw:
+                pc = parse_count(main_kw.get('monthlyPcQcCnt', 0))
+                mobile = parse_count(main_kw.get('monthlyMobileQcCnt', 0))
+                result['search_volume'] = {
+                    'total': pc + mobile,
+                    'pc': pc,
+                    'mobile': mobile,
+                    'competition': main_kw.get('compIdx', '-')
+                }
+
+            # 연관 키워드 (검색량 순 정렬)
+            related = []
+            for kw in keywords_list:
+                rel_keyword = kw.get('relKeyword', '')
+                if rel_keyword.strip() == keyword.strip():
+                    continue
+                volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
+                related.append({
+                    'keyword': rel_keyword,
+                    'volume': volume,
+                    'competition': kw.get('compIdx', '-')
+                })
+            related.sort(key=lambda x: x['volume'], reverse=True)
+            result['related_keywords'] = related[:20]
+
+        # 2. 콘텐츠 수
+        result['content_counts'] = get_content_counts(keyword)
+
+        # 3. 쇼핑 상위 상품
+        result['top_products'] = get_shopping_top_products(keyword, 10)
+
+        # 4. 상품지수 + 매출 (로컬 API)
+        score_data = get_product_score(keyword)
+        if score_data and score_data.get('result'):
+            products = score_data.get('result', {}).get('products', [])[:10]
+
+            for p in products:
+                result['product_scores'].append({
+                    'rank': p.get('rank', '-'),
+                    'mall': p.get('mallName', '-'),
+                    'title': p.get('productTitle', '-'),
+                    'price': p.get('lowPrice', 0),
+                    'review_cnt': p.get('reviewCount', 0),
+                    'purchase': p.get('purchaseCnt', 0),
+                    'mall_seq': p.get('mallSeq')
+                })
+
+            # 상위 5개 스토어 월간 매출
+            seen_malls = set()
+            for p in products[:10]:
+                mall_seq = p.get('mallSeq')
+                if mall_seq and mall_seq not in seen_malls:
+                    seen_malls.add(mall_seq)
+                    sales = get_brand_sales(mall_seq, 'monthly')
+                    if sales and sales.get('success'):
+                        total_amount = sales.get('summary', {}).get('total_amount', 0)
+                        result['monthly_sales'].append({
+                            'mall': p.get('mallName', '-'),
+                            'mall_seq': mall_seq,
+                            'total_amount': total_amount
+                        })
+                    if len(result['monthly_sales']) >= 5:
+                        break
+                    time.sleep(0.3)
+
+        # 5. AI 서브키워드 분석
+        if include_ai and result['related_keywords']:
+            # 서브키워드별 추가 데이터 수집
+            keyword_data = {}
+            for kw in result['related_keywords'][:10]:
+                kw_name = kw['keyword']
+                # 상품 수
+                counts = get_content_counts(kw_name)
+
+                # 상위 매출 (간략하게)
+                top_sales = 0
+                score = get_product_score(kw_name)
+                if score and score.get('result'):
+                    prods = score.get('result', {}).get('products', [])
+                    if prods:
+                        mall_seq = prods[0].get('mallSeq')
+                        if mall_seq:
+                            sales = get_brand_sales(mall_seq, 'monthly')
+                            if sales and sales.get('success'):
+                                top_sales = sales.get('summary', {}).get('total_amount', 0)
+
+                keyword_data[kw_name] = {
+                    'product_count': counts.get('shop', 0),
+                    'top_sales': top_sales
+                }
+                time.sleep(0.2)
+
+            # AI 분석 호출
+            ai_result = analyze_sub_keywords(keyword, result['related_keywords'], keyword_data)
+            if ai_result.get('success'):
+                result['sub_keyword_analysis'] = ai_result.get('analysis')
+
+            # AI 요약 생성
+            summary_result = generate_report_summary(result)
+            if summary_result.get('success'):
+                result['ai_summary'] = summary_result.get('summary')
+
+        return jsonify({"success": True, "data": result})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@keyword_report_bp.route('/api/keyword-report/quick', methods=['POST'])
+@login_required
+def quick_analyze():
+    """
+    빠른 키워드 분석 (AI 제외, 기본 데이터만)
+    """
+    try:
+        data = request.get_json()
+        keyword = data.get('keyword', '').strip()
+
+        if not keyword:
+            return jsonify({"success": False, "error": "키워드를 입력하세요."}), 400
+
+        result = {
+            "keyword": keyword,
+            "search_volume": {},
+            "content_counts": {},
+            "related_keywords": []
+        }
+
+        # 검색량 + 연관 키워드
+        stats = get_keyword_stats(keyword)
+        if stats and 'keywordList' in stats:
+            keywords_list = stats['keywordList']
+
+            main_kw = next((kw for kw in keywords_list if kw.get('relKeyword', '').strip() == keyword.strip()),
+                          keywords_list[0] if keywords_list else None)
+            if main_kw:
+                pc = parse_count(main_kw.get('monthlyPcQcCnt', 0))
+                mobile = parse_count(main_kw.get('monthlyMobileQcCnt', 0))
+                result['search_volume'] = {
+                    'total': pc + mobile,
+                    'pc': pc,
+                    'mobile': mobile,
+                    'competition': main_kw.get('compIdx', '-')
+                }
+
+            related = []
+            for kw in keywords_list:
+                rel_keyword = kw.get('relKeyword', '')
+                if rel_keyword.strip() == keyword.strip():
+                    continue
+                volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
+                related.append({
+                    'keyword': rel_keyword,
+                    'volume': volume,
+                    'competition': kw.get('compIdx', '-')
+                })
+            related.sort(key=lambda x: x['volume'], reverse=True)
+            result['related_keywords'] = related[:20]
+
+        # 콘텐츠 수
+        result['content_counts'] = get_content_counts(keyword)
+
+        return jsonify({"success": True, "data": result})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@keyword_report_bp.route('/api/keyword-report/ai-analyze', methods=['POST'])
+@login_required
+def ai_only_analyze():
+    """
+    AI 분석만 수행 (이미 수집된 데이터로)
+    """
+    try:
+        data = request.get_json()
+        keyword = data.get('keyword', '').strip()
+        related_keywords = data.get('related_keywords', [])
+        keyword_data = data.get('keyword_data', {})
+
+        if not keyword or not related_keywords:
+            return jsonify({"success": False, "error": "키워드와 연관 키워드 데이터가 필요합니다."}), 400
+
+        result = analyze_sub_keywords(keyword, related_keywords, keyword_data)
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
