@@ -1,6 +1,7 @@
 from flask import Blueprint, session, redirect, render_template, jsonify, request
 from functools import wraps
 import os
+import requests
 
 from utils.db import get_db, get_user_usage, increment_usage, add_user_log
 
@@ -8,6 +9,32 @@ product_score_bp = Blueprint('product_score', __name__)
 
 # 로컬 서버 URL
 RANK_API_URL = os.environ.get('RANK_API_URL', '')
+
+
+def get_product_index(mids):
+    """
+    로컬 서버에서 상품지수 조회 (bulk)
+
+    Args:
+        mids: MID 목록 (리스트)
+
+    Returns:
+        상품지수 데이터 또는 None
+    """
+    if not RANK_API_URL or not mids:
+        return None
+
+    try:
+        response = requests.post(
+            f"{RANK_API_URL}/api/product-index/bulk",
+            json={"mids": mids},
+            timeout=60
+        )
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Product index error: {e}")
+    return None
 
 # 일반 등급 무료 사용 횟수
 FREE_LIMIT_MARKETING = 30  # 마케팅 동의
@@ -109,3 +136,31 @@ def use_product_score():
         'remaining': remaining,
         'message': f'남은 횟수: {remaining}회'
     })
+
+
+@product_score_bp.route('/api/product-score/search', methods=['POST'])
+@login_required
+def search_product_index():
+    """키워드로 검색 후 상품지수 조회"""
+    data = request.get_json()
+    mids = data.get('mids', [])
+
+    if not mids:
+        return jsonify({'success': False, 'message': 'MID 목록이 필요합니다.'})
+
+    if not RANK_API_URL:
+        return jsonify({'success': False, 'message': '서버 설정 오류'})
+
+    # 상품지수 조회
+    result = get_product_index(mids)
+
+    if result:
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': '상품지수 조회 실패'
+        })
