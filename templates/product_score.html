@@ -250,26 +250,22 @@ async function searchProducts() {
     resultCount.textContent = '';
 
     try {
-        const r = await fetch(RANK_API_URL + '/api/product-score?keyword=' + encodeURIComponent(keyword), {
-            method: 'GET',
-            mode: 'cors',
-            headers: {'Accept': 'application/json'}
-        });
+        const r = await fetch('/api/product-score/search?keyword=' + encodeURIComponent(keyword));
         const d = await r.json();
 
-        if (d.result && d.result.products && d.result.products.length > 0) {
+        if (d.success && d.products && d.products.length > 0) {
             await fetch('/api/product-score/use', { method: 'POST' });
             await checkUsage();
 
-            currentProducts = d.result.products;
+            currentProducts = d.products;
             currentKeyword = keyword;
-            resultCount.textContent = `${d.result.products.length}개 결과`;
+            resultCount.textContent = `${d.products.length}개 결과`;
             document.getElementById('resultHeader').classList.remove('hidden');
-            renderScoreTable(d.result.products);
+            renderScoreTable(d.products);
         } else {
             currentProducts = [];
             document.getElementById('resultHeader').classList.add('hidden');
-            resultArea.innerHTML = '<div class="text-center py-16"><div class="text-5xl mb-4">📭</div><p class="text-base-content/60">검색 결과가 없습니다.</p></div>';
+            resultArea.innerHTML = '<div class="text-center py-16"><div class="text-5xl mb-4">📭</div><p class="text-base-content/60">' + (d.message || '검색 결과가 없습니다.') + '</p></div>';
         }
     } catch(e) {
         console.error(e);

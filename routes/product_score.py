@@ -165,26 +165,12 @@ def search_product_index():
         item = {
             'rank': p['rank'],
             'mid': mid,
-            'title': p['title'],
-            'mall': p['mall']
         }
 
-        # 상품지수 데이터 병합
+        # 상품지수 데이터 병합 (로컬 서버에서 온 모든 필드)
         if indices and mid in indices:
             idx = indices[mid]
-            item.update({
-                'mallName': idx.get('mallName', ''),
-                'imageUrl': idx.get('imageUrl', ''),
-                'lowPrice': idx.get('lowPrice', 0),
-                'saleStarScore': idx.get('saleStarScore', 0),
-                'hitStarScore': idx.get('hitStarScore', 0),
-                'qualityStarScore': idx.get('qualityStarScore', 0),
-                'reviewCountStarScore': idx.get('reviewCountStarScore', 0),
-                'abuseStarScore': idx.get('abuseStarScore', 0),
-                'keepCnt': idx.get('keepCnt', 0),
-                'purchaseCnt': idx.get('purchaseCnt', 0),
-                'reviewCount': idx.get('reviewCount', 0),
-            })
+            item.update(idx)
 
         results.append(item)
 
