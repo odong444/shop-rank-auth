@@ -300,42 +300,34 @@ def analyze_keyword():
                         break
                     time.sleep(0.3)
 
-        # 5. AI 서브키워드 분석
+        # 5. AI 서브키워드 분석 (간소화 - 상위 5개만, 상품수만 조회)
         if include_ai and result['related_keywords']:
-            # 서브키워드별 추가 데이터 수집
             keyword_data = {}
-            for kw in result['related_keywords'][:10]:
+            # 상위 5개 키워드만 상품수 조회 (타임아웃 방지)
+            for kw in result['related_keywords'][:5]:
                 kw_name = kw['keyword']
-                # 상품 수
-                counts = get_content_counts(kw_name)
-
-                # 상위 매출 (간략하게)
-                top_sales = 0
-                score = get_product_score(kw_name)
-                if score and score.get('result'):
-                    prods = score.get('result', {}).get('products', [])
-                    if prods:
-                        mall_seq = prods[0].get('mallSeq')
-                        if mall_seq:
-                            sales = get_brand_sales(mall_seq, 'monthly')
-                            if sales and sales.get('success'):
-                                top_sales = sales.get('summary', {}).get('total_amount', 0)
-
-                keyword_data[kw_name] = {
-                    'product_count': counts.get('shop', 0),
-                    'top_sales': top_sales
-                }
-                time.sleep(0.2)
+                try:
+                    counts = get_content_counts(kw_name)
+                    keyword_data[kw_name] = {
+                        'product_count': counts.get('shop', 0),
+                        'top_sales': 0  # 매출은 메인 키워드 데이터 참고하도록
+                    }
+                except:
+                    keyword_data[kw_name] = {'product_count': 0, 'top_sales': 0}
+                time.sleep(0.1)
 
             # AI 분석 호출
+            print(f"[AI] Calling Claude API for {keyword}")
             ai_result = analyze_sub_keywords(keyword, result['related_keywords'], keyword_data)
             if ai_result.get('success'):
                 result['sub_keyword_analysis'] = ai_result.get('analysis')
+            else:
+                print(f"[AI] Error: {ai_result.get('error')}")
 
-            # AI 요약 생성
-            summary_result = generate_report_summary(result)
-            if summary_result.get('success'):
-                result['ai_summary'] = summary_result.get('summary')
+            # AI 요약은 생략 (속도 개선)
+            # summary_result = generate_report_summary(result)
+            # if summary_result.get('success'):
+            #     result['ai_summary'] = summary_result.get('summary')
 
         return jsonify({"success": True, "data": result})
 
