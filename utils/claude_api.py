@@ -1,5 +1,5 @@
 """
-Claude API 유틸리티
+AI API 유틸리티 (OpenAI GPT)
 - 서브키워드 선별
 - 키워드 전략 분석
 """
@@ -7,28 +7,27 @@ import os
 import requests
 import json
 
-# API 키 (환경변수에서 가져옴 - 서버에서 CLAUDE_API_KEY 환경변수 설정 필요)
-CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
-CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# OpenAI API 키 (환경변수에서 가져옴)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL = "gpt-4o-mini"  # 저렴하고 빠른 모델
 
 
-def call_claude(prompt, max_tokens=2000):
-    """Claude API 호출"""
-    if not CLAUDE_API_KEY:
+def call_ai(prompt, max_tokens=2000):
+    """OpenAI GPT API 호출"""
+    if not OPENAI_API_KEY:
         return {
             "success": False,
-            "error": "CLAUDE_API_KEY 환경변수가 설정되지 않았습니다."
+            "error": "OPENAI_API_KEY 환경변수가 설정되지 않았습니다."
         }
 
     headers = {
-        "x-api-key": CLAUDE_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json"
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
     }
 
     payload = {
-        "model": CLAUDE_MODEL,
+        "model": OPENAI_MODEL,
         "max_tokens": max_tokens,
         "messages": [
             {"role": "user", "content": prompt}
@@ -36,12 +35,12 @@ def call_claude(prompt, max_tokens=2000):
     }
 
     try:
-        response = requests.post(CLAUDE_API_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=60)
         if response.status_code == 200:
             data = response.json()
             return {
                 "success": True,
-                "content": data["content"][0]["text"]
+                "content": data["choices"][0]["message"]["content"]
             }
         else:
             return {
@@ -134,7 +133,7 @@ JSON 형식:
 
 반드시 위 JSON 형식만 응답하세요. 다른 텍스트 없이 JSON만 반환하세요."""
 
-    result = call_claude(prompt)
+    result = call_ai(prompt)
 
     if result["success"]:
         try:
@@ -197,7 +196,7 @@ def generate_report_summary(report_data):
 
 전문적이지만 이해하기 쉽게 작성하세요."""
 
-    result = call_claude(prompt, max_tokens=1000)
+    result = call_ai(prompt, max_tokens=1000)
 
     if result["success"]:
         return {
