@@ -130,8 +130,34 @@ def get_shopping_top_products(keyword, count=10):
 
 
 # ========== 로컬 API 서버 호출 ==========
+def extract_store_url(product_link):
+    """상품 링크에서 스토어 URL 추출"""
+    import re
+    # smartstore.naver.com/storename/products/xxx
+    match = re.search(r'(https?://smartstore\.naver\.com/[^/]+)', product_link)
+    if match:
+        return match.group(1)
+    # brand.naver.com/brandname/products/xxx
+    match = re.search(r'(https?://brand\.naver\.com/[^/]+)', product_link)
+    if match:
+        return match.group(1)
+    return None
+
+
+def get_brand_sales_by_url(store_url, period='monthly'):
+    """스토어 URL로 매출 조회 (로컬 API)"""
+    try:
+        url = f"{RANK_API_URL}/api/brand-sales?store_url={requests.utils.quote(store_url)}&period={period}"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Brand sales by URL error: {e}")
+    return None
+
+
 def get_product_score(keyword):
-    """상품지수 조회 (로컬 API)"""
+    """상품지수 조회 (로컬 API) - 현재 네이버에서 차단됨"""
     try:
         url = f"{RANK_API_URL}/api/product-score?keyword={requests.utils.quote(keyword)}"
         response = requests.get(url, timeout=60)
@@ -266,39 +292,28 @@ def analyze_keyword():
         # 3. 쇼핑 상위 상품
         result['top_products'] = get_shopping_top_products(keyword, 10)
 
-        # 4. 상품지수 + 매출 (로컬 API)
-        score_data = get_product_score(keyword)
-        if score_data and score_data.get('result'):
-            products = score_data.get('result', {}).get('products', [])[:10]
+        # 4. 상위 스토어 월간 매출 (쇼핑 검색 결과 링크에서 스토어 URL 추출)
+        if result['top_products']:
+            seen_stores = set()
+            for p in result['top_products'][:10]:
+                link = p.get('link', '')
+                store_url = extract_store_url(link)
 
-            for p in products:
-                result['product_scores'].append({
-                    'rank': p.get('rank', '-'),
-                    'mall': p.get('mallName', '-'),
-                    'title': p.get('productTitle', '-'),
-                    'price': p.get('lowPrice', 0),
-                    'review_cnt': p.get('reviewCount', 0),
-                    'purchase': p.get('purchaseCnt', 0),
-                    'mall_seq': p.get('mallSeq')
-                })
-
-            # 상위 5개 스토어 월간 매출
-            seen_malls = set()
-            for p in products[:10]:
-                mall_seq = p.get('mallSeq')
-                if mall_seq and mall_seq not in seen_malls:
-                    seen_malls.add(mall_seq)
-                    sales = get_brand_sales(mall_seq, 'monthly')
+                if store_url and store_url not in seen_stores:
+                    seen_stores.add(store_url)
+                    print(f"[Sales] Fetching: {store_url}")
+                    sales = get_brand_sales_by_url(store_url, 'monthly')
                     if sales and sales.get('success'):
                         total_amount = sales.get('summary', {}).get('total_amount', 0)
                         result['monthly_sales'].append({
-                            'mall': p.get('mallName', '-'),
-                            'mall_seq': mall_seq,
+                            'mall': p.get('mall', '-'),
+                            'store_url': store_url,
                             'total_amount': total_amount
                         })
+                        print(f"[Sales] {p.get('mall')}: {total_amount:,}원")
                     if len(result['monthly_sales']) >= 5:
                         break
-                    time.sleep(0.3)
+                    time.sleep(0.2)
 
         # 5. AI 서브키워드 분석 (간소화 - 상위 5개만, 상품수만 조회)
         if include_ai and result['related_keywords']:
