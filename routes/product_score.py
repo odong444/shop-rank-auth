@@ -4,6 +4,7 @@ import os
 import requests
 
 from utils.db import get_db, get_user_usage, increment_usage, add_user_log
+from utils.naver_api import get_naver_search_results, get_product_indices_from_local
 
 product_score_bp = Blueprint('product_score', __name__)
 
@@ -138,29 +139,58 @@ def use_product_score():
     })
 
 
-@product_score_bp.route('/api/product-score/search', methods=['POST'])
+@product_score_bp.route('/api/product-score/search', methods=['GET'])
 @login_required
 def search_product_index():
-    """키워드로 검색 후 상품지수 조회"""
-    data = request.get_json()
-    mids = data.get('mids', [])
+    """키워드로 상품 검색 + 상품지수 조회"""
+    keyword = request.args.get('keyword')
+    if not keyword:
+        return jsonify({'success': False, 'message': '키워드를 입력해주세요.'})
 
-    if not mids:
-        return jsonify({'success': False, 'message': 'MID 목록이 필요합니다.'})
+    # 1. 네이버 API로 상품 목록 조회 (MID 포함)
+    products = get_naver_search_results(keyword)
+    if not products:
+        return jsonify({'success': False, 'message': '검색 결과가 없습니다.'})
 
-    if not RANK_API_URL:
-        return jsonify({'success': False, 'message': '서버 설정 오류'})
+    # 2. MID 목록 추출 (상위 50개만)
+    mids = [p['mid'] for p in products[:50]]
 
-    # 상품지수 조회
-    result = get_product_index(mids)
+    # 3. 로컬 서버에서 상품지수 조회
+    indices = get_product_indices_from_local(mids)
 
-    if result:
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': '상품지수 조회 실패'
-        })
+    # 4. 결과 병합
+    results = []
+    for p in products[:50]:
+        mid = p['mid']
+        item = {
+            'rank': p['rank'],
+            'mid': mid,
+            'title': p['title'],
+            'mall': p['mall']
+        }
+
+        # 상품지수 데이터 병합
+        if indices and mid in indices:
+            idx = indices[mid]
+            item.update({
+                'mallName': idx.get('mallName', ''),
+                'imageUrl': idx.get('imageUrl', ''),
+                'lowPrice': idx.get('lowPrice', 0),
+                'saleStarScore': idx.get('saleStarScore', 0),
+                'hitStarScore': idx.get('hitStarScore', 0),
+                'qualityStarScore': idx.get('qualityStarScore', 0),
+                'reviewCountStarScore': idx.get('reviewCountStarScore', 0),
+                'abuseStarScore': idx.get('abuseStarScore', 0),
+                'keepCnt': idx.get('keepCnt', 0),
+                'purchaseCnt': idx.get('purchaseCnt', 0),
+                'reviewCount': idx.get('reviewCount', 0),
+            })
+
+        results.append(item)
+
+    return jsonify({
+        'success': True,
+        'keyword': keyword,
+        'total': len(results),
+        'products': results
+    })

@@ -2,10 +2,14 @@ import urllib.request
 import urllib.parse
 import json
 import time
+import os
+import requests
 from datetime import datetime, timedelta
 import pytz
 
 from utils.db import get_db
+
+RANK_API_URL = os.environ.get('RANK_API_URL', '')
 
 NAVER_CLIENT_ID = "UrlniCJoGZ_jfgk5tlkN"
 NAVER_CLIENT_SECRET = "x3z9b1CM2F"
@@ -112,15 +116,36 @@ def update_all_products_with_keyword(keyword, results):
 def get_naver_rank(keyword, target_mid):
     """단일 상품 순위 조회 (캐시 활용)"""
     results = get_cached_results(keyword)
-    
+
     if not results:
         results = get_naver_search_results(keyword)
         if results:
             save_cache(keyword, results)
             update_all_products_with_keyword(keyword, results)
-    
+
     for r in results:
         if r['mid'] == str(target_mid):
             return r['rank'], r['title'], r['mall']
-    
+
     return None, None, None
+
+
+def get_product_indices_from_local(mids):
+    """로컬 서버에서 상품지수 일괄 조회"""
+    if not RANK_API_URL or not mids:
+        return None
+
+    try:
+        response = requests.post(
+            f"{RANK_API_URL}/api/product-index/bulk",
+            json={"mids": mids},
+            timeout=60
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                # MID를 키로 하는 딕셔너리로 변환
+                return {str(item['mid']): item['data']['result'] for item in data.get('results', [])}
+    except Exception as e:
+        print(f"Product index fetch error: {e}")
+    return None
