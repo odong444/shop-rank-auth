@@ -15,6 +15,8 @@ OPENAI_MODEL = "gpt-4o-mini"  # 저렴하고 빠른 모델
 
 def call_ai(prompt, max_tokens=2000):
     """OpenAI GPT API 호출"""
+    print(f"[AI] API Key exists: {bool(OPENAI_API_KEY)}")
+
     if not OPENAI_API_KEY:
         return {
             "success": False,
@@ -35,7 +37,10 @@ def call_ai(prompt, max_tokens=2000):
     }
 
     try:
+        print(f"[AI] Calling OpenAI API...")
         response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=60)
+        print(f"[AI] Response status: {response.status_code}")
+
         if response.status_code == 200:
             data = response.json()
             return {
@@ -43,11 +48,13 @@ def call_ai(prompt, max_tokens=2000):
                 "content": data["choices"][0]["message"]["content"]
             }
         else:
+            print(f"[AI] Error response: {response.text[:500]}")
             return {
                 "success": False,
-                "error": f"API 오류: {response.status_code} - {response.text}"
+                "error": f"API 오류: {response.status_code} - {response.text[:200]}"
             }
     except Exception as e:
+        print(f"[AI] Exception: {e}")
         return {
             "success": False,
             "error": str(e)
