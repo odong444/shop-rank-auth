@@ -71,10 +71,13 @@ def get_keyword_stats(keyword):
     headers = get_ad_header(method, uri)
     try:
         response = requests.get(AD_BASE_URL + uri, headers=headers, params=params, timeout=30)
+        print(f"[Keyword API] status={response.status_code}, keyword={keyword}")
         if response.status_code == 200:
             return response.json()
+        else:
+            print(f"[Keyword API] Error response: {response.text[:500]}")
     except Exception as e:
-        print(f"Keyword stats error: {e}")
+        print(f"[Keyword API] Exception: {e}")
     return None
 
 
@@ -337,6 +340,9 @@ def analyze_keyword():
         return jsonify({"success": True, "data": result})
 
     except Exception as e:
+        import traceback
+        print(f"[Analyze Error] {e}")
+        print(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
 
