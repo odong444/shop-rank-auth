@@ -131,16 +131,31 @@ def get_shopping_top_products(keyword, count=10):
 
 # ========== 로컬 API 서버 호출 ==========
 def extract_store_url(product_link):
-    """상품 링크에서 스토어 URL 추출"""
+    """상품 링크에서 스토어 URL 추출 (리다이렉트 따라감)"""
     import re
-    # smartstore.naver.com/storename/products/xxx
-    match = re.search(r'(https?://smartstore\.naver\.com/[^/]+)', product_link)
+
+    # 이미 스토어 URL 형태인 경우
+    match = re.search(r'(https?://smartstore\.naver\.com/[^/\?]+)', product_link)
     if match:
         return match.group(1)
-    # brand.naver.com/brandname/products/xxx
-    match = re.search(r'(https?://brand\.naver\.com/[^/]+)', product_link)
+    match = re.search(r'(https?://brand\.naver\.com/[^/\?]+)', product_link)
     if match:
         return match.group(1)
+
+    # 리다이렉트 URL인 경우 따라가서 실제 URL 얻기
+    try:
+        response = requests.head(product_link, allow_redirects=True, timeout=5)
+        final_url = response.url
+
+        match = re.search(r'(https?://smartstore\.naver\.com/[^/\?]+)', final_url)
+        if match:
+            return match.group(1)
+        match = re.search(r'(https?://brand\.naver\.com/[^/\?]+)', final_url)
+        if match:
+            return match.group(1)
+    except Exception as e:
+        print(f"[Extract URL] Error following redirect: {e}")
+
     return None
 
 
@@ -336,12 +351,24 @@ def analyze_keyword():
             ai_result = analyze_sub_keywords(keyword, result['related_keywords'], keyword_data)
             if ai_result.get('success'):
                 result['sub_keyword_analysis'] = ai_result.get('analysis')
+
+                # AI 추천 키워드로 related_keywords 대체
+                ai_keywords = ai_result.get('analysis', {}).get('recommended_keywords', [])
+                if ai_keywords:
+                    result['related_keywords'] = [
+                        {
+                            'keyword': kw.get('keyword', ''),
+                            'volume': kw.get('search_volume', 0),
+                            'competition': kw.get('competition_level', '-'),
+                            'product_count': kw.get('product_count', 0),
+                            'reason': kw.get('reason', ''),
+                            'entry_difficulty': kw.get('entry_difficulty', '-')
+                        }
+                        for kw in ai_keywords
+                    ]
+                    print(f"[AI] Replaced related_keywords with {len(ai_keywords)} AI recommendations")
             else:
                 print(f"[AI] Error: {ai_result.get('error')}")
-
-            # AI 요약은 생략 (속도 개선)
-            # summary_result = generate_report_summary(result)
-            # if summary_result.get('success'):
             #     result['ai_summary'] = summary_result.get('summary')
 
         return jsonify({"success": True, "data": result})
