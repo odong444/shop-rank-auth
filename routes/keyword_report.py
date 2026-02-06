@@ -133,55 +133,67 @@ def get_shopping_top_products(keyword, count=10):
 
 # ========== 로컬 API 서버 호출 ==========
 def _match_store_url(url):
-    """URL에서 스마트스토어/브랜드 URL 추출 (헬퍼)"""
+    """URL에서 스마트스토어/브랜드 URL 추출 (헬퍼), /main 제외"""
     import re
     match = re.search(r'(https?://smartstore\.naver\.com/[^/\?&\s]+)', url)
     if match:
-        return match.group(1)
+        store_url = match.group(1)
+        # /main은 공용 경로이므로 실제 스토어가 아님
+        if store_url.endswith('/main'):
+            return None
+        return store_url
     match = re.search(r'(https?://brand\.naver\.com/[^/\?&\s]+)', url)
     if match:
         return match.group(1)
     return None
 
 
+def _follow_redirect(url):
+    """URL 리다이렉트를 따라가서 최종 URL 반환"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, allow_redirects=True, timeout=5, stream=True)
+        final_url = response.url
+        response.close()
+        return final_url
+    except Exception as e:
+        print(f"[Extract URL] Redirect error: {e}")
+        return None
+
+
 def extract_store_url(product_link):
     """상품 링크에서 스토어 URL 추출 (리다이렉트 따라감)"""
     from urllib.parse import unquote
 
-    # 1) 원본 링크에서 직접 추출
+    # 1) 원본 링크에서 직접 추출 (/main 아닌 경우)
     result = _match_store_url(product_link)
     if result:
         return result
 
-    # 2) URL 인코딩된 트래킹 링크 처리 (cr.shopping.naver.com 등)
+    # 2) URL 인코딩된 트래킹 링크 처리
     decoded = unquote(product_link)
     if decoded != product_link:
         result = _match_store_url(decoded)
         if result:
             return result
 
-    # 3) 리다이렉트 URL인 경우 따라가서 실제 URL 얻기
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        response = requests.get(product_link, headers=headers, allow_redirects=True, timeout=5, stream=True)
-        final_url = response.url
-        response.close()
-        print(f"[Extract URL] Redirect: {product_link[:80]} -> {final_url[:80]}")
-
+    # 3) smartstore.naver.com/main/products/XXX → 리다이렉트로 실제 스토어 URL 획득
+    #    네이버 쇼핑 API가 /main/ 공용 경로로 반환하므로 반드시 리다이렉트 필요
+    print(f"[Extract URL] Following redirect for: {product_link[:100]}")
+    final_url = _follow_redirect(product_link)
+    if final_url:
+        print(f"[Extract URL] Redirected to: {final_url[:100]}")
         result = _match_store_url(final_url)
         if result:
             return result
 
-        # 리다이렉트 URL도 인코딩되어 있을 수 있음
         decoded_final = unquote(final_url)
         if decoded_final != final_url:
             result = _match_store_url(decoded_final)
             if result:
                 return result
-    except Exception as e:
-        print(f"[Extract URL] Error following redirect: {e}")
 
     return None
 
@@ -367,12 +379,7 @@ def analyze_keyword():
                     print(f"[Sales] Product link for {mall}: {link[:100]}")
 
                     store_url = extract_store_url(link)
-                    print(f"[Sales] Extracted store URL: {store_url}")
-
-                    # smartstore.naver.com/main 은 실제 스토어가 아님, 스킵
-                    if store_url and store_url.endswith('/main'):
-                        print(f"[Sales] Skipping invalid store URL: {store_url}")
-                        continue
+                    print(f"[Sales] Extracted store URL for {mall}: {store_url}")
 
                     if store_url and store_url not in seen_stores:
                         seen_stores.add(store_url)
