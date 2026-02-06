@@ -402,11 +402,15 @@ def fetch_sales():
         if not products:
             return jsonify({"success": False, "error": "상품 데이터가 필요합니다."}), 400
 
-        # 스마트스토어 상품만 필터 (리졸브 가능한 것)
-        smartstore_products = [
-            p for p in products[:10]
-            if 'smartstore.naver.com/main/' in p.get('link', '')
-        ]
+        # 스마트스토어 상품만 필터 + 중복 mall 제거
+        seen_malls = set()
+        smartstore_products = []
+        for p in products[:10]:
+            mall = p.get('mall', '')
+            link = p.get('link', '')
+            if 'smartstore.naver.com/main/' in link and mall not in seen_malls:
+                seen_malls.add(mall)
+                smartstore_products.append(p)
         print(f"[Sales] {len(smartstore_products)} smartstore products to resolve")
 
         monthly_sales = []
@@ -436,20 +440,23 @@ def fetch_sales():
                 print(f"[Sales] Error for {mall}: {e}")
             return None
 
-        # 병렬 리졸브 (최대 3개 동시)
+        # 병렬 리졸브 (최대 3개 동시, Cloudflare 100초 제한 대비)
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:6]}
-            for future in as_completed(futures, timeout=90):
-                try:
-                    sale = future.result()
-                    if sale and sale['store_url'] not in seen_stores:
-                        seen_stores.add(sale['store_url'])
-                        monthly_sales.append(sale)
-                        print(f"[Sales] Got: {sale['mall']} = {sale['total_amount']}")
-                        if len(monthly_sales) >= 3:
-                            break
-                except Exception as e:
-                    print(f"[Sales] Future error: {e}")
+            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:3]}
+            try:
+                for future in as_completed(futures, timeout=75):
+                    try:
+                        sale = future.result()
+                        if sale and sale['store_url'] not in seen_stores:
+                            seen_stores.add(sale['store_url'])
+                            monthly_sales.append(sale)
+                            print(f"[Sales] Got: {sale['mall']} = {sale['total_amount']}")
+                            if len(monthly_sales) >= 3:
+                                break
+                    except Exception as e:
+                        print(f"[Sales] Future error: {e}")
+            except Exception as e:
+                print(f"[Sales] Timeout waiting for futures: {e}")
 
         print(f"[Sales] Done: {len(monthly_sales)} results")
         return jsonify({"success": True, "monthly_sales": monthly_sales})
