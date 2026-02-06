@@ -331,18 +331,31 @@ def analyze_keyword():
             for p in result['top_products'][:5]:
                 try:
                     link = p.get('link', '')
+                    mall = p.get('mall', '-')
+                    print(f"[Sales] Product link for {mall}: {link[:100]}")
+
                     store_url = extract_store_url(link)
+                    print(f"[Sales] Extracted store URL: {store_url}")
+
+                    # main은 실제 스토어가 아님, 스킵
+                    if store_url and '/main' in store_url:
+                        print(f"[Sales] Skipping invalid store URL: {store_url}")
+                        continue
 
                     if store_url and store_url not in seen_stores:
                         seen_stores.add(store_url)
+                        print(f"[Sales] Fetching sales for: {store_url}")
                         sales = get_brand_sales_by_url(store_url, 'monthly')
                         if sales and sales.get('success'):
                             total_amount = sales.get('summary', {}).get('total_amount', 0)
                             result['monthly_sales'].append({
-                                'mall': p.get('mall', '-'),
+                                'mall': mall,
                                 'store_url': store_url,
                                 'total_amount': total_amount
                             })
+                            print(f"[Sales] Got sales for {mall}: {total_amount}")
+                        else:
+                            print(f"[Sales] No sales data for {mall}")
                         if len(result['monthly_sales']) >= 3:
                             break
                 except Exception as e:
