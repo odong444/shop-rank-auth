@@ -38,7 +38,7 @@ def call_ai(prompt, max_tokens=2000):
 
     try:
         print(f"[AI] Calling OpenAI API...")
-        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=25)
         print(f"[AI] Response status: {response.status_code}")
 
         if response.status_code == 200:

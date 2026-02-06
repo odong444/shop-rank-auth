@@ -350,45 +350,49 @@ def analyze_keyword():
             print(f"[Analyze] Step 4 done: {len(result['monthly_sales'])} sales")
 
         # 5. AI 서브키워드 분석 (간소화 - 상위 5개만, 상품수만 조회)
+        print(f"[Analyze] Step 5: AI analysis (include_ai={include_ai})")
         if include_ai and result['related_keywords']:
-            keyword_data = {}
-            # 상위 5개 키워드만 상품수 조회 (타임아웃 방지)
-            for kw in result['related_keywords'][:5]:
-                kw_name = kw['keyword']
-                try:
-                    counts = get_content_counts(kw_name)
-                    keyword_data[kw_name] = {
-                        'product_count': counts.get('shop', 0),
-                        'top_sales': 0  # 매출은 메인 키워드 데이터 참고하도록
-                    }
-                except:
-                    keyword_data[kw_name] = {'product_count': 0, 'top_sales': 0}
-                time.sleep(0.1)
-
-            # AI 분석 호출
-            print(f"[AI] Calling Claude API for {keyword}")
-            ai_result = analyze_sub_keywords(keyword, result['related_keywords'], keyword_data)
-            if ai_result.get('success'):
-                result['sub_keyword_analysis'] = ai_result.get('analysis')
-
-                # AI 추천 키워드로 related_keywords 대체
-                ai_keywords = ai_result.get('analysis', {}).get('recommended_keywords', [])
-                if ai_keywords:
-                    result['related_keywords'] = [
-                        {
-                            'keyword': kw.get('keyword', ''),
-                            'volume': kw.get('search_volume', 0),
-                            'competition': kw.get('competition_level', '-'),
-                            'product_count': kw.get('product_count', 0),
-                            'reason': kw.get('reason', ''),
-                            'entry_difficulty': kw.get('entry_difficulty', '-')
+            try:
+                keyword_data = {}
+                # 상위 5개 키워드만 상품수 조회 (타임아웃 방지)
+                for kw in result['related_keywords'][:5]:
+                    kw_name = kw['keyword']
+                    try:
+                        counts = get_content_counts(kw_name)
+                        keyword_data[kw_name] = {
+                            'product_count': counts.get('shop', 0),
+                            'top_sales': 0
                         }
-                        for kw in ai_keywords
-                    ]
-                    print(f"[AI] Replaced related_keywords with {len(ai_keywords)} AI recommendations")
-            else:
-                print(f"[AI] Error: {ai_result.get('error')}")
-            #     result['ai_summary'] = summary_result.get('summary')
+                    except:
+                        keyword_data[kw_name] = {'product_count': 0, 'top_sales': 0}
+
+                # AI 분석 호출
+                print(f"[AI] Calling Claude API for {keyword}")
+                ai_result = analyze_sub_keywords(keyword, result['related_keywords'], keyword_data)
+                if ai_result.get('success'):
+                    result['sub_keyword_analysis'] = ai_result.get('analysis')
+
+                    # AI 추천 키워드로 related_keywords 대체
+                    ai_keywords = ai_result.get('analysis', {}).get('recommended_keywords', [])
+                    if ai_keywords:
+                        result['related_keywords'] = [
+                            {
+                                'keyword': kw.get('keyword', ''),
+                                'volume': kw.get('search_volume', 0),
+                                'competition': kw.get('competition_level', '-'),
+                                'product_count': kw.get('product_count', 0),
+                                'reason': kw.get('reason', ''),
+                                'entry_difficulty': kw.get('entry_difficulty', '-')
+                            }
+                            for kw in ai_keywords
+                        ]
+                        print(f"[AI] Replaced related_keywords with {len(ai_keywords)} AI recommendations")
+                else:
+                    print(f"[AI] Error: {ai_result.get('error')}")
+            except Exception as e:
+                print(f"[Analyze] Step 5 AI error: {e}")
+        else:
+            print(f"[Analyze] Step 5 skipped (include_ai={include_ai})")
 
         return jsonify({"success": True, "data": result})
 
