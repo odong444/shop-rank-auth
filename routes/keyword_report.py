@@ -155,7 +155,7 @@ def _resolve_url_via_rank_api(product_url):
         api_base = RANK_API_URL.rstrip('/')
         url = f"{api_base}/api/resolve-url?url={quote(product_url, safe='')}"
         print(f"[Resolve URL] Calling: {url[:120]}")
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(url, timeout=35)
         print(f"[Resolve URL] status={resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -371,43 +371,11 @@ def analyze_keyword():
         except Exception as e:
             print(f"[Analyze] Step 3 error: {e}")
 
-        # 4. 상위 스토어 월간 매출 (상위 3개만, 빠르게)
-        print(f"[Analyze] Step 4: Monthly sales")
-        if result['top_products']:
-            seen_stores = set()
-            for p in result['top_products'][:10]:
-                try:
-                    link = p.get('link', '')
-                    mall = p.get('mall', '-')
-                    print(f"[Sales] Product link for {mall}: {link[:100]}")
-
-                    store_url = extract_store_url(link)
-                    print(f"[Sales] Extracted store URL for {mall}: {store_url}")
-
-                    if store_url and store_url not in seen_stores:
-                        seen_stores.add(store_url)
-                        print(f"[Sales] Fetching sales for: {store_url}")
-                        sales = get_brand_sales_by_url(store_url, 'monthly')
-                        print(f"[Sales] API response for {mall}: success={sales.get('success') if sales else 'None'}")
-                        if sales and sales.get('success'):
-                            total_amount = sales.get('summary', {}).get('total_amount', 0)
-                            result['monthly_sales'].append({
-                                'mall': mall,
-                                'store_url': store_url,
-                                'total_amount': total_amount
-                            })
-                            print(f"[Sales] Got sales for {mall}: {total_amount}")
-                        else:
-                            error_msg = sales.get('error', 'unknown') if sales else 'no response'
-                            print(f"[Sales] No sales data for {mall}: {error_msg}")
-                        if len(result['monthly_sales']) >= 3:
-                            break
-                except Exception as e:
-                    print(f"[Analyze] Sales error for {p.get('mall')}: {e}")
-            print(f"[Analyze] Step 4 done: {len(result['monthly_sales'])} sales")
+        # 4. 매출 조회는 별도 API로 분리 (헤드리스 브라우저 리졸브 시간 소요)
+        # 프론트엔드에서 /api/keyword-report/sales 별도 호출
+        result['sales_available'] = len(result['top_products']) > 0
 
         # AI 분석은 별도 API로 분리 (타임아웃 방지)
-        # include_ai 플래그는 프론트엔드에서 별도 호출 여부 결정용
         result['ai_available'] = include_ai and len(result['related_keywords']) > 0
 
         return jsonify({"success": True, "data": result})
@@ -415,6 +383,80 @@ def analyze_keyword():
     except Exception as e:
         import traceback
         print(f"[Analyze Error] {e}")
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@keyword_report_bp.route('/api/keyword-report/sales', methods=['POST'])
+@login_required
+def fetch_sales():
+    """
+    상위 스토어 월간 매출 조회 (별도 비동기 호출)
+    헤드리스 브라우저 리졸브 시간이 걸리므로 메인 분석과 분리
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    try:
+        data = request.get_json()
+        products = data.get('products', [])
+
+        if not products:
+            return jsonify({"success": False, "error": "상품 데이터가 필요합니다."}), 400
+
+        # 스마트스토어 상품만 필터 (리졸브 가능한 것)
+        smartstore_products = [
+            p for p in products[:10]
+            if 'smartstore.naver.com/main/' in p.get('link', '')
+        ]
+        print(f"[Sales] {len(smartstore_products)} smartstore products to resolve")
+
+        monthly_sales = []
+        seen_stores = set()
+
+        def resolve_and_fetch(product):
+            """URL 리졸브 + 매출 조회를 한번에"""
+            link = product.get('link', '')
+            mall = product.get('mall', '-')
+            try:
+                store_url = extract_store_url(link)
+                print(f"[Sales] {mall}: store_url={store_url}")
+                if not store_url:
+                    return None
+                sales = get_brand_sales_by_url(store_url, 'monthly')
+                if sales and sales.get('success'):
+                    total_amount = sales.get('summary', {}).get('total_amount', 0)
+                    return {
+                        'mall': mall,
+                        'store_url': store_url,
+                        'total_amount': total_amount
+                    }
+                else:
+                    error_msg = sales.get('error', 'unknown') if sales else 'no response'
+                    print(f"[Sales] No data for {mall}: {error_msg}")
+            except Exception as e:
+                print(f"[Sales] Error for {mall}: {e}")
+            return None
+
+        # 병렬 리졸브 (최대 3개 동시)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:6]}
+            for future in as_completed(futures, timeout=90):
+                try:
+                    sale = future.result()
+                    if sale and sale['store_url'] not in seen_stores:
+                        seen_stores.add(sale['store_url'])
+                        monthly_sales.append(sale)
+                        print(f"[Sales] Got: {sale['mall']} = {sale['total_amount']}")
+                        if len(monthly_sales) >= 3:
+                            break
+                except Exception as e:
+                    print(f"[Sales] Future error: {e}")
+
+        print(f"[Sales] Done: {len(monthly_sales)} results")
+        return jsonify({"success": True, "monthly_sales": monthly_sales})
+
+    except Exception as e:
+        import traceback
+        print(f"[Sales Error] {e}")
         print(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
