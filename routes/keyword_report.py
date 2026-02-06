@@ -148,87 +148,30 @@ def _match_store_url(url):
     return None
 
 
-def _get_store_from_product_no(product_no):
-    """상품번호로 네이버 내부 API에서 스토어 URL 조회"""
-    import re as _re
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Referer': f'https://smartstore.naver.com/main/products/{product_no}'
-    }
-
-    # 네이버 내부 API 엔드포인트 시도
-    endpoints = [
-        f'https://smartstore.naver.com/i/v1/stores/100000000/products/{product_no}',
-        f'https://smartstore.naver.com/i/v1/contents/products/{product_no}',
-    ]
-
-    for url in endpoints:
-        try:
-            resp = requests.get(url, headers=headers, timeout=5)
-            print(f"[Product API] {url[-60:]}: status={resp.status_code}, size={len(resp.text)}")
-            if resp.status_code == 200:
-                try:
-                    data = resp.json()
-                except:
-                    print(f"[Product API] Not JSON response")
-                    continue
-
-                # channel/store 객체에서 URL 추출
-                for key in ['channel', 'store', 'smartStore', 'naverShoppingStore']:
-                    obj = data.get(key, {})
-                    if isinstance(obj, dict):
-                        for url_key in ['url', 'channelUrl', 'storeUrl', 'pcUrl', 'mobileUrl']:
-                            val = obj.get(url_key, '')
-                            if val and 'naver.com' in val:
-                                result = _match_store_url(val)
-                                if result:
-                                    print(f"[Product API] Found store URL: {result}")
-                                    return result
-
-                # JSON 텍스트에서 직접 검색
-                text = resp.text[:10000]
-                for m in _re.finditer(r'smartstore\.naver\.com/([a-zA-Z0-9_-]+)', text):
-                    name = m.group(1)
-                    if name not in ('main', 'i', 'search', 'v1', 'v2'):
-                        print(f"[Product API] Found store in JSON text: {name}")
-                        return f"https://smartstore.naver.com/{name}"
-
-                for m in _re.finditer(r'brand\.naver\.com/([a-zA-Z0-9_-]+)', text):
-                    name = m.group(1)
-                    if name not in ('i', 'search', 'v1', 'v2'):
-                        print(f"[Product API] Found brand in JSON text: {name}")
-                        return f"https://brand.naver.com/{name}"
-
-        except requests.exceptions.Timeout:
-            print(f"[Product API] Timeout: {url[-60:]}")
-        except Exception as e:
-            print(f"[Product API] Error: {e}")
-
-    return None
-
-
-def _get_store_from_rank_api(product_no):
-    """RANK API 서버에 상품번호로 스토어 URL 조회 요청"""
+def _resolve_url_via_rank_api(product_url):
+    """RANK API 서버에 상품 URL을 보내서 JS 리다이렉트 후 실제 URL 받기"""
+    from urllib.parse import quote
     try:
-        url = f"{RANK_API_URL}/api/store-url?product_no={product_no}"
-        print(f"[RANK API] Resolving store: {url}")
+        api_base = RANK_API_URL.rstrip('/')
+        url = f"{api_base}/api/resolve-url?url={quote(product_url, safe='')}"
+        print(f"[Resolve URL] Calling: {url[:120]}")
         resp = requests.get(url, timeout=10)
-        print(f"[RANK API] status={resp.status_code}")
+        print(f"[Resolve URL] status={resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
-            store_url = data.get('store_url', '')
-            if store_url:
-                print(f"[RANK API] Resolved: {store_url}")
-                return store_url
+            if data.get('success'):
+                resolved = data.get('resolved_url', '')
+                print(f"[Resolve URL] Resolved: {resolved}")
+                return resolved
+            else:
+                print(f"[Resolve URL] Failed: {data.get('error', 'unknown')}")
     except Exception as e:
-        print(f"[RANK API] Error: {e}")
+        print(f"[Resolve URL] Error: {e}")
     return None
 
 
 def extract_store_url(product_link):
     """상품 링크에서 스토어 URL 추출"""
-    import re as _re
     from urllib.parse import unquote
 
     # 1) 원본 링크에서 직접 추출 (/main 아닌 경우)
@@ -243,27 +186,17 @@ def extract_store_url(product_link):
         if result:
             return result
 
-    # 3) smartstore.naver.com/main/products/XXX → 상품번호로 스토어 조회
+    # 3) smartstore.naver.com/main/products/XXX → RANK API로 JS 리다이렉트 해석
     if 'smartstore.naver.com/main/' in product_link:
-        m = _re.search(r'/products/(\d+)', product_link)
-        if m:
-            product_no = m.group(1)
-            print(f"[Extract URL] Product No: {product_no}")
-
-            # 3-1) 네이버 내부 API 시도
-            result = _get_store_from_product_no(product_no)
+        print(f"[Extract URL] Resolving via RANK API: {product_link[:80]}")
+        resolved = _resolve_url_via_rank_api(product_link)
+        if resolved:
+            result = _match_store_url(resolved)
             if result:
                 return result
-
-            # 3-2) RANK API 서버에 요청 (헤드리스 브라우저 등 활용)
-            result = _get_store_from_rank_api(product_no)
-            if result:
-                return result
-
         return None
 
     # 4) 기타 URL (search.shopping.naver.com 등)은 스토어 URL 추출 불가
-    print(f"[Extract URL] Unsupported URL format: {product_link[:100]}")
     return None
 
 
@@ -271,7 +204,8 @@ def get_brand_sales_by_url(store_url, period='monthly'):
     """스토어 URL로 매출 조회 (로컬 API)"""
     try:
         from urllib.parse import quote
-        url = f"{RANK_API_URL}/api/brand-sales?store_url={quote(store_url, safe='')}&period={period}"
+        api_base = RANK_API_URL.rstrip('/')
+        url = f"{api_base}/api/brand-sales?store_url={quote(store_url, safe='')}&period={period}"
         print(f"[BrandSales] Calling: {url[:120]}")
         response = requests.get(url, timeout=30)
         print(f"[BrandSales] Status: {response.status_code}")
