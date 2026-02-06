@@ -132,29 +132,54 @@ def get_shopping_top_products(keyword, count=10):
 
 
 # ========== 로컬 API 서버 호출 ==========
+def _match_store_url(url):
+    """URL에서 스마트스토어/브랜드 URL 추출 (헬퍼)"""
+    import re
+    match = re.search(r'(https?://smartstore\.naver\.com/[^/\?&\s]+)', url)
+    if match:
+        return match.group(1)
+    match = re.search(r'(https?://brand\.naver\.com/[^/\?&\s]+)', url)
+    if match:
+        return match.group(1)
+    return None
+
+
 def extract_store_url(product_link):
     """상품 링크에서 스토어 URL 추출 (리다이렉트 따라감)"""
-    import re
+    from urllib.parse import unquote
 
-    # 이미 스토어 URL 형태인 경우
-    match = re.search(r'(https?://smartstore\.naver\.com/[^/\?]+)', product_link)
-    if match:
-        return match.group(1)
-    match = re.search(r'(https?://brand\.naver\.com/[^/\?]+)', product_link)
-    if match:
-        return match.group(1)
+    # 1) 원본 링크에서 직접 추출
+    result = _match_store_url(product_link)
+    if result:
+        return result
 
-    # 리다이렉트 URL인 경우 따라가서 실제 URL 얻기
+    # 2) URL 인코딩된 트래킹 링크 처리 (cr.shopping.naver.com 등)
+    decoded = unquote(product_link)
+    if decoded != product_link:
+        result = _match_store_url(decoded)
+        if result:
+            return result
+
+    # 3) 리다이렉트 URL인 경우 따라가서 실제 URL 얻기
     try:
-        response = requests.head(product_link, allow_redirects=True, timeout=5)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        response = requests.get(product_link, headers=headers, allow_redirects=True, timeout=5, stream=True)
         final_url = response.url
+        response.close()
+        print(f"[Extract URL] Redirect: {product_link[:80]} -> {final_url[:80]}")
 
-        match = re.search(r'(https?://smartstore\.naver\.com/[^/\?]+)', final_url)
-        if match:
-            return match.group(1)
-        match = re.search(r'(https?://brand\.naver\.com/[^/\?]+)', final_url)
-        if match:
-            return match.group(1)
+        result = _match_store_url(final_url)
+        if result:
+            return result
+
+        # 리다이렉트 URL도 인코딩되어 있을 수 있음
+        decoded_final = unquote(final_url)
+        if decoded_final != final_url:
+            result = _match_store_url(decoded_final)
+            if result:
+                return result
     except Exception as e:
         print(f"[Extract URL] Error following redirect: {e}")
 
@@ -164,12 +189,19 @@ def extract_store_url(product_link):
 def get_brand_sales_by_url(store_url, period='monthly'):
     """스토어 URL로 매출 조회 (로컬 API)"""
     try:
-        url = f"{RANK_API_URL}/api/brand-sales?store_url={requests.utils.quote(store_url)}&period={period}"
+        from urllib.parse import quote
+        url = f"{RANK_API_URL}/api/brand-sales?store_url={quote(store_url, safe='')}&period={period}"
+        print(f"[BrandSales] Calling: {url[:120]}")
         response = requests.get(url, timeout=30)
+        print(f"[BrandSales] Status: {response.status_code}")
         if response.status_code == 200:
             return response.json()
+        else:
+            print(f"[BrandSales] Error body: {response.text[:200]}")
+    except requests.exceptions.Timeout:
+        print(f"[BrandSales] Timeout for: {store_url}")
     except Exception as e:
-        print(f"Brand sales by URL error: {e}")
+        print(f"[BrandSales] Error: {e}")
     return None
 
 
@@ -328,7 +360,7 @@ def analyze_keyword():
         print(f"[Analyze] Step 4: Monthly sales")
         if result['top_products']:
             seen_stores = set()
-            for p in result['top_products'][:5]:
+            for p in result['top_products'][:10]:
                 try:
                     link = p.get('link', '')
                     mall = p.get('mall', '-')
@@ -337,8 +369,8 @@ def analyze_keyword():
                     store_url = extract_store_url(link)
                     print(f"[Sales] Extracted store URL: {store_url}")
 
-                    # main은 실제 스토어가 아님, 스킵
-                    if store_url and '/main' in store_url:
+                    # smartstore.naver.com/main 은 실제 스토어가 아님, 스킵
+                    if store_url and store_url.endswith('/main'):
                         print(f"[Sales] Skipping invalid store URL: {store_url}")
                         continue
 
@@ -346,6 +378,7 @@ def analyze_keyword():
                         seen_stores.add(store_url)
                         print(f"[Sales] Fetching sales for: {store_url}")
                         sales = get_brand_sales_by_url(store_url, 'monthly')
+                        print(f"[Sales] API response for {mall}: success={sales.get('success') if sales else 'None'}")
                         if sales and sales.get('success'):
                             total_amount = sales.get('summary', {}).get('total_amount', 0)
                             result['monthly_sales'].append({
@@ -355,7 +388,8 @@ def analyze_keyword():
                             })
                             print(f"[Sales] Got sales for {mall}: {total_amount}")
                         else:
-                            print(f"[Sales] No sales data for {mall}")
+                            error_msg = sales.get('error', 'unknown') if sales else 'no response'
+                            print(f"[Sales] No sales data for {mall}: {error_msg}")
                         if len(result['monthly_sales']) >= 3:
                             break
                 except Exception as e:
