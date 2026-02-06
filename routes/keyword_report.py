@@ -70,12 +70,14 @@ def get_keyword_stats(keyword):
     params = {'hintKeywords': keyword, 'showDetail': '1'}
     headers = get_ad_header(method, uri)
     try:
-        response = requests.get(AD_BASE_URL + uri, headers=headers, params=params, timeout=30)
+        response = requests.get(AD_BASE_URL + uri, headers=headers, params=params, timeout=10)
         print(f"[Keyword API] status={response.status_code}, keyword={keyword}")
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"[Keyword API] Error response: {response.text[:500]}")
+            print(f"[Keyword API] Error response: {response.text[:200]}")
+    except requests.exceptions.Timeout:
+        print(f"[Keyword API] Timeout for keyword: {keyword}")
     except Exception as e:
         print(f"[Keyword API] Exception: {e}")
     return None
@@ -269,66 +271,83 @@ def analyze_keyword():
         }
 
         # 1. 검색량 + 연관 키워드
-        stats = get_keyword_stats(keyword)
-        if stats and 'keywordList' in stats:
-            keywords_list = stats['keywordList']
+        print(f"[Analyze] Step 1: Keyword stats for '{keyword}'")
+        try:
+            stats = get_keyword_stats(keyword)
+            if stats and 'keywordList' in stats:
+                keywords_list = stats['keywordList']
 
-            # 메인 키워드 검색량
-            main_kw = next((kw for kw in keywords_list if kw.get('relKeyword', '').strip() == keyword.strip()),
-                          keywords_list[0] if keywords_list else None)
-            if main_kw:
-                pc = parse_count(main_kw.get('monthlyPcQcCnt', 0))
-                mobile = parse_count(main_kw.get('monthlyMobileQcCnt', 0))
-                result['search_volume'] = {
-                    'total': pc + mobile,
-                    'pc': pc,
-                    'mobile': mobile,
-                    'competition': main_kw.get('compIdx', '-')
-                }
+                # 메인 키워드 검색량
+                main_kw = next((kw for kw in keywords_list if kw.get('relKeyword', '').strip() == keyword.strip()),
+                              keywords_list[0] if keywords_list else None)
+                if main_kw:
+                    pc = parse_count(main_kw.get('monthlyPcQcCnt', 0))
+                    mobile = parse_count(main_kw.get('monthlyMobileQcCnt', 0))
+                    result['search_volume'] = {
+                        'total': pc + mobile,
+                        'pc': pc,
+                        'mobile': mobile,
+                        'competition': main_kw.get('compIdx', '-')
+                    }
 
-            # 연관 키워드 (검색량 순 정렬)
-            related = []
-            for kw in keywords_list:
-                rel_keyword = kw.get('relKeyword', '')
-                if rel_keyword.strip() == keyword.strip():
-                    continue
-                volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
-                related.append({
-                    'keyword': rel_keyword,
-                    'volume': volume,
-                    'competition': kw.get('compIdx', '-')
-                })
-            related.sort(key=lambda x: x['volume'], reverse=True)
-            result['related_keywords'] = related[:20]
+                # 연관 키워드 (검색량 순 정렬)
+                related = []
+                for kw in keywords_list:
+                    rel_keyword = kw.get('relKeyword', '')
+                    if rel_keyword.strip() == keyword.strip():
+                        continue
+                    volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
+                    related.append({
+                        'keyword': rel_keyword,
+                        'volume': volume,
+                        'competition': kw.get('compIdx', '-')
+                    })
+                related.sort(key=lambda x: x['volume'], reverse=True)
+                result['related_keywords'] = related[:20]
+                print(f"[Analyze] Step 1 done: {len(related)} related keywords")
+        except Exception as e:
+            print(f"[Analyze] Step 1 error: {e}")
 
         # 2. 콘텐츠 수
-        result['content_counts'] = get_content_counts(keyword)
+        print(f"[Analyze] Step 2: Content counts")
+        try:
+            result['content_counts'] = get_content_counts(keyword)
+            print(f"[Analyze] Step 2 done: {result['content_counts']}")
+        except Exception as e:
+            print(f"[Analyze] Step 2 error: {e}")
 
         # 3. 쇼핑 상위 상품
-        result['top_products'] = get_shopping_top_products(keyword, 10)
+        print(f"[Analyze] Step 3: Top products")
+        try:
+            result['top_products'] = get_shopping_top_products(keyword, 10)
+            print(f"[Analyze] Step 3 done: {len(result['top_products'])} products")
+        except Exception as e:
+            print(f"[Analyze] Step 3 error: {e}")
 
-        # 4. 상위 스토어 월간 매출 (쇼핑 검색 결과 링크에서 스토어 URL 추출)
+        # 4. 상위 스토어 월간 매출 (상위 3개만, 빠르게)
+        print(f"[Analyze] Step 4: Monthly sales")
         if result['top_products']:
             seen_stores = set()
-            for p in result['top_products'][:10]:
-                link = p.get('link', '')
-                store_url = extract_store_url(link)
+            for p in result['top_products'][:5]:
+                try:
+                    link = p.get('link', '')
+                    store_url = extract_store_url(link)
 
-                if store_url and store_url not in seen_stores:
-                    seen_stores.add(store_url)
-                    print(f"[Sales] Fetching: {store_url}")
-                    sales = get_brand_sales_by_url(store_url, 'monthly')
-                    if sales and sales.get('success'):
-                        total_amount = sales.get('summary', {}).get('total_amount', 0)
-                        result['monthly_sales'].append({
-                            'mall': p.get('mall', '-'),
-                            'store_url': store_url,
-                            'total_amount': total_amount
-                        })
-                        print(f"[Sales] {p.get('mall')}: {total_amount:,}원")
-                    if len(result['monthly_sales']) >= 5:
-                        break
-                    time.sleep(0.2)
+                    if store_url and store_url not in seen_stores:
+                        seen_stores.add(store_url)
+                        sales = get_brand_sales_by_url(store_url, 'monthly')
+                        if sales and sales.get('success'):
+                            total_amount = sales.get('summary', {}).get('total_amount', 0)
+                            result['monthly_sales'].append({
+                                'mall': p.get('mall', '-'),
+                                'store_url': store_url,
+                                'total_amount': total_amount
+                            })
+                        if len(result['monthly_sales']) >= 3:
+                            break
+                except Exception as e:
+                    print(f"[Analyze] Sales error for {p.get('mall')}: {e}")
+            print(f"[Analyze] Step 4 done: {len(result['monthly_sales'])} sales")
 
         # 5. AI 서브키워드 분석 (간소화 - 상위 5개만, 상품수만 조회)
         if include_ai and result['related_keywords']:
