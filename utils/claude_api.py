@@ -40,8 +40,9 @@ def call_ai(prompt, max_tokens=2000):
     }
 
     try:
-        print(f"[AI] Sending request to OpenAI... (timeout=20s)")
-        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=20)
+        print(f"[AI] Sending request to OpenAI... (connect=5s, read=15s)")
+        # 연결 타임아웃 5초, 읽기 타임아웃 15초
+        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=(5, 15))
         print(f"[AI] Response received! status: {response.status_code}")
 
         if response.status_code == 200:
@@ -56,12 +57,18 @@ def call_ai(prompt, max_tokens=2000):
                 "success": False,
                 "error": f"API 오류: {response.status_code} - {response.text[:200]}"
             }
+    except requests.exceptions.ConnectTimeout:
+        print(f"[AI] Connection timeout - cannot connect to OpenAI")
+        return {"success": False, "error": "OpenAI 연결 타임아웃"}
+    except requests.exceptions.ReadTimeout:
+        print(f"[AI] Read timeout - OpenAI response too slow")
+        return {"success": False, "error": "OpenAI 응답 타임아웃"}
+    except requests.exceptions.ConnectionError as e:
+        print(f"[AI] Connection error: {e}")
+        return {"success": False, "error": f"OpenAI 연결 실패: {e}"}
     except Exception as e:
-        print(f"[AI] Exception: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        print(f"[AI] Exception: {type(e).__name__}: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def analyze_sub_keywords(main_keyword, related_keywords, keyword_data):
