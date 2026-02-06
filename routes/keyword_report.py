@@ -148,23 +148,55 @@ def _match_store_url(url):
     return None
 
 
-def _follow_redirect(url):
-    """URL 리다이렉트를 따라가서 최종 URL 반환"""
+def _extract_store_from_page(product_url):
+    """상품 페이지 HTML에서 실제 스토어 URL 추출 (JS 리다이렉트 대응)"""
+    import re
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml'
         }
-        response = requests.get(url, headers=headers, allow_redirects=True, timeout=5, stream=True)
-        final_url = response.url
+        response = requests.get(product_url, headers=headers, timeout=5, stream=True)
+        # head 영역만 읽기 (canonical, og:url 등은 <head>에 있음)
+        chunks = []
+        size = 0
+        for chunk in response.iter_content(4096):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size >= 30000:
+                break
         response.close()
-        return final_url
+        html = b''.join(chunks).decode('utf-8', errors='ignore')
+
+        # smartstore.naver.com/실제스토어명/products/ 패턴 (main 제외)
+        for m in re.finditer(r'smartstore\.naver\.com/([a-zA-Z0-9_-]+)/products/', html):
+            store_name = m.group(1)
+            if store_name != 'main':
+                print(f"[Extract Page] Found store: {store_name}")
+                return f"https://smartstore.naver.com/{store_name}"
+
+        # brand.naver.com 패턴
+        m = re.search(r'brand\.naver\.com/([a-zA-Z0-9_-]+)/products/', html)
+        if m:
+            print(f"[Extract Page] Found brand: {m.group(1)}")
+            return f"https://brand.naver.com/{m.group(1)}"
+
+        # JSON 데이터에서 스토어 URL 추출 (window.__PRELOADED_STATE__ 등)
+        m = re.search(r'"(?:storeUrl|channelUrl|shopUrl)":\s*"(https?://(?:smartstore|brand)\.naver\.com/[^"]+)"', html)
+        if m:
+            result = _match_store_url(m.group(1))
+            if result:
+                print(f"[Extract Page] Found in JSON: {result}")
+                return result
+
+        print(f"[Extract Page] No store found in HTML (read {size} bytes)")
     except Exception as e:
-        print(f"[Extract URL] Redirect error: {e}")
-        return None
+        print(f"[Extract Page] Error: {e}")
+    return None
 
 
 def extract_store_url(product_link):
-    """상품 링크에서 스토어 URL 추출 (리다이렉트 따라감)"""
+    """상품 링크에서 스토어 URL 추출"""
     from urllib.parse import unquote
 
     # 1) 원본 링크에서 직접 추출 (/main 아닌 경우)
@@ -179,22 +211,14 @@ def extract_store_url(product_link):
         if result:
             return result
 
-    # 3) smartstore.naver.com/main/products/XXX → 리다이렉트로 실제 스토어 URL 획득
-    #    네이버 쇼핑 API가 /main/ 공용 경로로 반환하므로 반드시 리다이렉트 필요
-    print(f"[Extract URL] Following redirect for: {product_link[:100]}")
-    final_url = _follow_redirect(product_link)
-    if final_url:
-        print(f"[Extract URL] Redirected to: {final_url[:100]}")
-        result = _match_store_url(final_url)
-        if result:
-            return result
+    # 3) smartstore.naver.com/main/products/XXX → HTML 파싱으로 실제 스토어 URL 추출
+    #    네이버는 JS 리다이렉트 사용하므로 HTTP 리다이렉트 불가, HTML에서 직접 찾아야 함
+    if 'smartstore.naver.com/main/' in product_link:
+        print(f"[Extract URL] Parsing HTML for: {product_link[:100]}")
+        return _extract_store_from_page(product_link)
 
-        decoded_final = unquote(final_url)
-        if decoded_final != final_url:
-            result = _match_store_url(decoded_final)
-            if result:
-                return result
-
+    # 4) 기타 URL (search.shopping.naver.com 등)은 스토어 URL 추출 불가
+    print(f"[Extract URL] Unsupported URL format: {product_link[:100]}")
     return None
 
 
