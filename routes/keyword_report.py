@@ -337,11 +337,14 @@ def analyze_keyword():
                         'competition': main_kw.get('compIdx', '-')
                     }
 
-                # 연관 키워드 (검색량 순 정렬)
+                # 연관 키워드 (메인 키워드 포함 + 검색량 순 정렬)
                 related = []
                 for kw in keywords_list:
                     rel_keyword = kw.get('relKeyword', '')
                     if rel_keyword.strip() == keyword.strip():
+                        continue
+                    # 메인 키워드가 포함된 키워드만 선별
+                    if keyword not in rel_keyword:
                         continue
                     volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
                     related.append({
@@ -350,7 +353,7 @@ def analyze_keyword():
                         'competition': kw.get('compIdx', '-')
                     })
                 related.sort(key=lambda x: x['volume'], reverse=True)
-                result['related_keywords'] = related[:30]
+                result['related_keywords'] = related[:10]
                 print(f"[Analyze] Step 1 done: {len(related)} related keywords")
         except Exception as e:
             print(f"[Analyze] Step 1 error: {e}")
@@ -510,6 +513,9 @@ def quick_analyze():
                 rel_keyword = kw.get('relKeyword', '')
                 if rel_keyword.strip() == keyword.strip():
                     continue
+                # 메인 키워드가 포함된 키워드만 선별
+                if keyword not in rel_keyword:
+                    continue
                 volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
                 related.append({
                     'keyword': rel_keyword,
@@ -517,7 +523,7 @@ def quick_analyze():
                     'competition': kw.get('compIdx', '-')
                 })
             related.sort(key=lambda x: x['volume'], reverse=True)
-            result['related_keywords'] = related[:30]
+            result['related_keywords'] = related[:10]
 
         # 콘텐츠 수
         result['content_counts'] = get_content_counts(keyword)
