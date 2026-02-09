@@ -30,9 +30,6 @@ NAVER_CLIENT_SECRET = os.environ.get('NAVER_CLIENT_SECRET', 'x3z9b1CM2F')
 # 로컬 API 서버 (매출 조회용)
 RANK_API_URL = os.environ.get('RANK_API_URL', 'https://api.bw-rank.kr')
 
-# 타임아웃 설정
-RESOLVE_TIMEOUT = 65   # RANK API resolve-url 호출 (헤드리스 브라우저 60초 + 버퍼)
-SALES_TOTAL_TIMEOUT = 85  # 전체 매출 조회 (Cloudflare 100초 내)
 
 
 def login_required(f):
@@ -160,7 +157,7 @@ def _resolve_url_via_rank_api(product_url):
         api_base = RANK_API_URL.rstrip('/')
         url = f"{api_base}/api/resolve-url?url={quote(product_url, safe='')}"
         print(f"[Resolve URL] Calling: {url[:120]}")
-        resp = requests.get(url, timeout=RESOLVE_TIMEOUT)
+        resp = requests.get(url, timeout=65)
         print(f"[Resolve URL] status={resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -473,7 +470,7 @@ def fetch_sales():
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:5]}
             try:
-                for future in as_completed(futures, timeout=SALES_TOTAL_TIMEOUT):
+                for future in as_completed(futures, timeout=85):
                     try:
                         sale = future.result()
                         if sale and sale['store_url'] not in seen_stores:
