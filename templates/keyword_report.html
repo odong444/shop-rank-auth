@@ -295,9 +295,11 @@ async function runSalesAnalysis(products) {
             // 매출 데이터 렌더링
             salesTbody.innerHTML = '';
             result.monthly_sales.forEach((s, i) => {
+                const matchLabel = s.match_type === 'store_total' ? '<span style="color:#f39c12;font-size:11px">(스토어 전체)</span>' : '';
+                const productName = s.product_name ? `<small style="color:#667eea">${s.product_name.substring(0, 40)}</small><br>` : '';
                 salesTbody.innerHTML += `<tr>
                     <td>${i+1}</td>
-                    <td>${s.mall}<br><small style="color:#888">${s.title || ''}</small></td>
+                    <td>${s.mall} ${matchLabel}<br>${productName}<small style="color:#888">${s.title || ''}</small></td>
                     <td>${formatNumber(s.total_amount)}원<br><small style="color:#888">${formatNumber(s.total_count || 0)}건</small></td>
                 </tr>`;
             });
