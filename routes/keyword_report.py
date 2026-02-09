@@ -434,80 +434,63 @@ def fetch_sales():
         monthly_sales = []
         seen_stores = set()
 
-        def _match_product_by_name(products_list, target_title):
-            """상품명으로 매칭 (키워드 포함 비교)"""
-            if not products_list or not target_title:
-                return None
-            # 정확 매칭 시도
-            target_clean = target_title.strip().lower()
-            for p in products_list:
-                name = (p.get('name') or '').strip().lower()
-                if name == target_clean:
-                    return p
-            # 부분 매칭: 타겟 키워드가 상품명에 포함되거나 그 반대
-            target_words = set(target_clean.split())
-            best_match = None
-            best_score = 0
-            for p in products_list:
-                name = (p.get('name') or '').strip().lower()
-                name_words = set(name.split())
-                # 겹치는 단어 수
-                common = len(target_words & name_words)
-                if common > best_score:
-                    best_score = common
-                    best_match = p
-            # 최소 2개 단어 이상 겹쳐야 매칭
-            if best_score >= 2:
-                return best_match
-            return None
-
         def resolve_and_fetch(product):
             """URL 리졸브 + 매출 조회를 한번에"""
+            import re
             link = product.get('link', '')
             mall = product.get('mall', '-')
             product_title = product.get('title', '')
+
+            # URL에서 상품번호 추출 (/products/5811396719)
+            pid_match = re.search(r'/products/(\d+)', link)
+            url_product_id = pid_match.group(1) if pid_match else ''
+
             try:
                 store_url = extract_store_url(link)
-                print(f"[Sales] {mall}: store_url={store_url}")
+                print(f"[Sales] {mall}: store_url={store_url}, url_pid={url_product_id}")
                 if not store_url:
                     return None
-                # product_id 없이 호출 → 전체 상품 매출 조회 후 이름 매칭
+                # 전체 상품 매출 조회 후 product_id로 매칭
                 sales = get_brand_sales_by_url(store_url, 'monthly')
                 if sales:
                     products_data = sales.get('products', [])
+                    print(f"[Sales] {mall}: {len(products_data)} products returned")
+
+                    if url_product_id and products_data:
+                        # 같은 product_id 찾아서 합산 (상품명 변경시 여러 행)
+                        matched = [p for p in products_data if str(p.get('product_id', '')) == url_product_id]
+                        if matched:
+                            total_amount = sum(p.get('amount', 0) for p in matched)
+                            total_count = sum(p.get('count', 0) for p in matched)
+                            total_clicks = sum(p.get('clicks', 0) for p in matched)
+                            result = {
+                                'mall': mall,
+                                'title': product_title,
+                                'store_url': store_url,
+                                'total_amount': total_amount,
+                                'total_count': total_count,
+                                'clicks': total_clicks,
+                                'match_type': 'product'
+                            }
+                            print(f"[Sales] {mall} MATCHED pid={url_product_id} ({len(matched)} rows): amount={total_amount}")
+                            return result
+
+                    # product_id 매칭 실패 → 스토어 전체 매출
                     summary = sales.get('summary', {})
-                    print(f"[Sales] {mall}: {len(products_data)} products, summary_amount={summary.get('total_amount', 0)}")
-
-                    # 1) 상품명으로 매칭 시도
-                    matched = _match_product_by_name(products_data, product_title)
-                    if matched:
-                        result = {
-                            'mall': mall,
-                            'title': product_title,
-                            'store_url': store_url,
-                            'total_amount': matched.get('amount', 0),
-                            'total_count': matched.get('count', 0),
-                            'product_name': matched.get('name', ''),
-                            'match_type': 'product'
-                        }
-                        print(f"[Sales] {mall} MATCHED: '{matched.get('name', '')[:30]}' amount={result['total_amount']}")
-                        return result
-
-                    # 2) 매칭 실패 → 스토어 전체 매출 사용
                     total_amount = summary.get('total_amount', 0)
                     if total_amount > 0:
-                        result = {
+                        print(f"[Sales] {mall} FALLBACK store total: amount={total_amount}")
+                        return {
                             'mall': mall,
                             'title': product_title,
                             'store_url': store_url,
                             'total_amount': total_amount,
                             'total_count': summary.get('total_count', 0),
+                            'clicks': summary.get('total_clicks', 0),
                             'match_type': 'store_total'
                         }
-                        print(f"[Sales] {mall} STORE TOTAL: amount={total_amount}")
-                        return result
                     else:
-                        print(f"[Sales] {mall}: no matching product and summary=0")
+                        print(f"[Sales] {mall}: no match and summary=0")
                 else:
                     print(f"[Sales] No response for {mall}")
             except Exception as e:
