@@ -123,7 +123,8 @@ def get_shopping_top_products(keyword, count=10):
                     'title': item.get('title', '').replace('<b>', '').replace('</b>', ''),
                     'mall': item.get('mallName', ''),
                     'price': int(item.get('lprice', '0')),
-                    'link': item.get('link', '')
+                    'link': item.get('link', ''),
+                    'productId': item.get('productId', '')
                 })
             return products
     except Exception as e:
@@ -200,12 +201,14 @@ def extract_store_url(product_link):
     return None
 
 
-def get_brand_sales_by_url(store_url, period='monthly'):
+def get_brand_sales_by_url(store_url, period='monthly', product_id=None):
     """스토어 URL로 매출 조회 (로컬 API)"""
     try:
         from urllib.parse import quote
         api_base = RANK_API_URL.rstrip('/')
         url = f"{api_base}/api/brand-sales?store_url={quote(store_url, safe='')}&period={period}"
+        if product_id:
+            url += f"&product_id={product_id}"
         print(f"[BrandSales] Calling: {url[:120]}")
         response = requests.get(url, timeout=30)
         print(f"[BrandSales] Status: {response.status_code}")
@@ -423,19 +426,30 @@ def fetch_sales():
             """URL 리졸브 + 매출 조회를 한번에"""
             link = product.get('link', '')
             mall = product.get('mall', '-')
+            product_id = product.get('productId', '')
+            product_title = product.get('title', '')
             try:
                 store_url = extract_store_url(link)
-                print(f"[Sales] {mall}: store_url={store_url}")
+                print(f"[Sales] {mall}: store_url={store_url}, product_id={product_id}")
                 if not store_url:
                     return None
-                sales = get_brand_sales_by_url(store_url, 'monthly')
+                sales = get_brand_sales_by_url(store_url, 'monthly', product_id)
                 if sales and sales.get('success'):
-                    total_amount = sales.get('summary', {}).get('total_amount', 0)
-                    return {
-                        'mall': mall,
-                        'store_url': store_url,
-                        'total_amount': total_amount
-                    }
+                    # 해당 상품의 매출만 추출
+                    products_data = sales.get('products', [])
+                    if products_data:
+                        # 첫 번째 상품이 해당 product_id (이미 필터링됨)
+                        product_sales = products_data[0]
+                        return {
+                            'mall': mall,
+                            'title': product_title,
+                            'store_url': store_url,
+                            'total_amount': product_sales.get('amount', 0),
+                            'total_count': product_sales.get('count', 0),
+                            'clicks': product_sales.get('clicks', 0)
+                        }
+                    else:
+                        print(f"[Sales] No sales data for product {product_id}")
                 else:
                     error_msg = sales.get('error', 'unknown') if sales else 'no response'
                     print(f"[Sales] No data for {mall}: {error_msg}")
@@ -443,9 +457,9 @@ def fetch_sales():
                 print(f"[Sales] Error for {mall}: {e}")
             return None
 
-        # 병렬 리졸브 (최대 2개 동시, Cloudflare 100초 제한 대비)
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:2]}
+        # 병렬 리졸브 (최대 3개 동시, Cloudflare 100초 제한 대비)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:5]}
             try:
                 for future in as_completed(futures, timeout=60):
                     try:
@@ -454,7 +468,7 @@ def fetch_sales():
                             seen_stores.add(sale['store_url'])
                             monthly_sales.append(sale)
                             print(f"[Sales] Got: {sale['mall']} = {sale['total_amount']}")
-                            if len(monthly_sales) >= 3:
+                            if len(monthly_sales) >= 5:
                                 break
                     except Exception as e:
                         print(f"[Sales] Future error: {e}")
