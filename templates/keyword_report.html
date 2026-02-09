@@ -54,11 +54,11 @@
             <input type="text" id="mainKeyword" placeholder="분석할 메인 키워드를 입력하세요 (예: 사과, 물티슈)" style="flex:1">
             <button onclick="analyzeKeyword()" id="analyzeBtn">분석 시작</button>
         </div>
-        <div class="checkbox-option">
-            <input type="checkbox" id="includeAI" checked>
+        <div class="checkbox-option" style="display:none">
+            <input type="checkbox" id="includeAI">
             <label for="includeAI">🤖 AI 서브키워드 분석 포함 (Claude API 사용)</label>
         </div>
-        <p style="margin-top:10px;font-size:12px;color:#888">* AI 분석 포함 시 더 정확한 서브키워드 추천과 전략을 제공합니다</p>
+        <p style="margin-top:10px;font-size:12px;color:#888;display:none">* AI 분석 포함 시 더 정확한 서브키워드 추천과 전략을 제공합니다</p>
     </div>
 </div>
 
@@ -79,7 +79,7 @@
                 <div class="step-icon pending">3</div>
                 <span>상위 스토어 월간 매출 조회</span>
             </div>
-            <div class="progress-step" data-step="4">
+            <div class="progress-step" data-step="4" style="display:none">
                 <div class="step-icon pending">4</div>
                 <span>AI 서브키워드 분석</span>
             </div>
@@ -204,7 +204,7 @@ let currentData = null; // 현재 분석 데이터 저장
 
 async function analyzeKeyword() {
     const keyword = document.getElementById('mainKeyword').value.trim();
-    const includeAI = document.getElementById('includeAI').checked;
+    const includeAI = false; // AI 분석 비활성화
     const btn = document.getElementById('analyzeBtn');
 
     if (!keyword) {
