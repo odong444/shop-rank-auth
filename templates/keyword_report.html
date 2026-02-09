@@ -40,6 +40,7 @@
 .progress-step .step-icon.loading { background: #667eea; color: white; animation: pulse 1s infinite; }
 .progress-step .step-icon.pending { background: #ddd; color: #888; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 .checkbox-option { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
 .checkbox-option input[type="checkbox"] { width: 18px; height: 18px; }
@@ -123,7 +124,7 @@
         <div class="card-header"><h3>🔗 연관 키워드 TOP 10</h3></div>
         <div class="card-body">
             <table class="keyword-table">
-                <thead><tr><th>#</th><th>키워드</th><th>검색량</th><th>클릭 수</th><th>클릭률</th><th>경쟁</th></tr></thead>
+                <thead><tr><th>#</th><th>키워드</th><th>검색량</th><th>광고 클릭</th><th>클릭률</th><th>경쟁</th></tr></thead>
                 <tbody id="relatedKeywords"></tbody>
             </table>
         </div>
@@ -135,7 +136,9 @@
         <div class="card-body">
             <table class="keyword-table">
                 <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th></tr></thead>
-                <tbody id="topSales"></tbody>
+                <tbody id="topSales">
+                    <tr><td colspan="3" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
+                </tbody>
             </table>
         </div>
     </div>
@@ -273,6 +276,11 @@ async function analyzeKeyword() {
 }
 
 async function runSalesAnalysis(products) {
+    const salesTbody = document.getElementById('topSales');
+    
+    // 로딩 표시
+    salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px"><div style="display:inline-block;width:20px;height:20px;border:3px solid #f3f3f3;border-top:3px solid #667eea;border-radius:50%;animation:spin 1s linear infinite"></div> 로딩중...</td></tr>';
+    
     try {
         const response = await fetch('/api/keyword-report/sales', {
             method: 'POST',
@@ -285,22 +293,23 @@ async function runSalesAnalysis(products) {
         if (result.success && result.monthly_sales && result.monthly_sales.length > 0) {
             updateProgress(3, 'done');
             // 매출 데이터 렌더링
-            const salesTbody = document.getElementById('topSales');
             salesTbody.innerHTML = '';
             result.monthly_sales.forEach((s, i) => {
                 salesTbody.innerHTML += `<tr>
                     <td>${i+1}</td>
-                    <td>${s.mall}</td>
-                    <td>${formatNumber(s.total_amount)}원</td>
+                    <td>${s.mall}<br><small style="color:#888">${s.title || ''}</small></td>
+                    <td>${formatNumber(s.total_amount)}원<br><small style="color:#888">${formatNumber(s.total_count || 0)}건</small></td>
                 </tr>`;
             });
             if (currentData) currentData.monthly_sales = result.monthly_sales;
         } else {
             updateProgress(3, 'done');
+            salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>';
             console.log('매출 데이터 없음');
         }
     } catch(e) {
         updateProgress(3, 'done');
+        salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#e74c3c">매출 조회 오류</td></tr>';
         console.error('매출 조회 오류:', e);
     }
 }

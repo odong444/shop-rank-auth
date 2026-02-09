@@ -156,7 +156,7 @@ def _resolve_url_via_rank_api(product_url):
         api_base = RANK_API_URL.rstrip('/')
         url = f"{api_base}/api/resolve-url?url={quote(product_url, safe='')}"
         print(f"[Resolve URL] Calling: {url[:120]}")
-        resp = requests.get(url, timeout=25)
+        resp = requests.get(url, timeout=15)
         print(f"[Resolve URL] status={resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -465,11 +465,11 @@ def fetch_sales():
                 print(f"[Sales] Error for {mall}: {e}")
             return None
 
-        # 병렬 리졸브 (최대 3개 동시, Cloudflare 100초 제한 대비)
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # 병렬 리졸브 (최대 5개 동시, Cloudflare 100초 제한 대비)
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:5]}
             try:
-                for future in as_completed(futures, timeout=60):
+                for future in as_completed(futures, timeout=50):
                     try:
                         sale = future.result()
                         if sale and sale['store_url'] not in seen_stores:
