@@ -30,9 +30,9 @@ NAVER_CLIENT_SECRET = os.environ.get('NAVER_CLIENT_SECRET', 'x3z9b1CM2F')
 # 로컬 API 서버 (매출 조회용)
 RANK_API_URL = os.environ.get('RANK_API_URL', 'https://api.bw-rank.kr')
 
-# 타임아웃 설정 (환경변수로 조절 가능)
-RESOLVE_TIMEOUT = int(os.environ.get('RESOLVE_TIMEOUT', '15'))
-SALES_TOTAL_TIMEOUT = int(os.environ.get('SALES_TOTAL_TIMEOUT', '50'))
+# 타임아웃 설정
+RESOLVE_TIMEOUT = 65   # RANK API resolve-url 호출 (헤드리스 브라우저 60초 + 버퍼)
+SALES_TOTAL_TIMEOUT = 85  # 전체 매출 조회 (Cloudflare 100초 내)
 
 
 def login_required(f):
