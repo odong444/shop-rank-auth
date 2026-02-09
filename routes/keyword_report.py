@@ -221,9 +221,9 @@ def get_brand_sales_by_url(store_url, period='monthly'):
 
 
 def get_product_score(keyword):
-    """상품지수 조회 (로컬 API) - 현재 네이버에서 차단됨"""
+    """상품지수 조회 (로컬 API) - 스마트스토어/브랜드스토어 전용"""
     try:
-        url = f"{RANK_API_URL}/api/product-score?keyword={requests.utils.quote(keyword)}"
+        url = f"{RANK_API_URL}/api/product-score/smartstore?keyword={requests.utils.quote(keyword)}"
         response = requests.get(url, timeout=60)
         if response.status_code == 200:
             return response.json()
@@ -350,7 +350,7 @@ def analyze_keyword():
                         'competition': kw.get('compIdx', '-')
                     })
                 related.sort(key=lambda x: x['volume'], reverse=True)
-                result['related_keywords'] = related[:20]
+                result['related_keywords'] = related[:5]
                 print(f"[Analyze] Step 1 done: {len(related)} related keywords")
         except Exception as e:
             print(f"[Analyze] Step 1 error: {e}")
@@ -517,7 +517,7 @@ def quick_analyze():
                     'competition': kw.get('compIdx', '-')
                 })
             related.sort(key=lambda x: x['volume'], reverse=True)
-            result['related_keywords'] = related[:20]
+            result['related_keywords'] = related[:5]
 
         # 콘텐츠 수
         result['content_counts'] = get_content_counts(keyword)
