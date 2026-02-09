@@ -350,7 +350,7 @@ def analyze_keyword():
                         'competition': kw.get('compIdx', '-')
                     })
                 related.sort(key=lambda x: x['volume'], reverse=True)
-                result['related_keywords'] = related[:5]
+                result['related_keywords'] = related[:30]
                 print(f"[Analyze] Step 1 done: {len(related)} related keywords")
         except Exception as e:
             print(f"[Analyze] Step 1 error: {e}")
@@ -517,7 +517,7 @@ def quick_analyze():
                     'competition': kw.get('compIdx', '-')
                 })
             related.sort(key=lambda x: x['volume'], reverse=True)
-            result['related_keywords'] = related[:5]
+            result['related_keywords'] = related[:30]
 
         # 콘텐츠 수
         result['content_counts'] = get_content_counts(keyword)

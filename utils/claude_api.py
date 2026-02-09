@@ -86,7 +86,7 @@ def analyze_sub_keywords(main_keyword, related_keywords, keyword_data):
 
     # 키워드 데이터 정리
     keyword_info = []
-    for kw in related_keywords[:20]:  # 상위 20개만
+    for kw in related_keywords[:30]:  # 상위 30개만
         kw_name = kw.get('keyword', '')
         data = keyword_data.get(kw_name, {})
         keyword_info.append({
