@@ -214,7 +214,10 @@ def get_brand_sales_by_url(store_url, period='monthly', product_id=None):
         response = requests.get(url, timeout=30)
         print(f"[BrandSales] Status: {response.status_code}")
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            print(f"[BrandSales] Response keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+            print(f"[BrandSales] Products count: {len(data.get('products', [])) if isinstance(data, dict) else 'N/A'}")
+            return data
         else:
             print(f"[BrandSales] Error body: {response.text[:200]}")
     except requests.exceptions.Timeout:
@@ -443,12 +446,13 @@ def fetch_sales():
                 if not store_url:
                     return None
                 sales = get_brand_sales_by_url(store_url, 'monthly', product_id)
+                print(f"[Sales] {mall} brand-sales response: {json.dumps(sales, ensure_ascii=False)[:300] if sales else 'None'}")
                 if sales:
                     # RANK API 응답: {mall_sequence, period, products: [...]}
                     products_data = sales.get('products', [])
                     if products_data:
                         product_sales = products_data[0]
-                        return {
+                        result = {
                             'mall': mall,
                             'title': product_title,
                             'store_url': store_url,
@@ -456,6 +460,8 @@ def fetch_sales():
                             'total_count': product_sales.get('count', 0),
                             'clicks': product_sales.get('clicks', 0)
                         }
+                        print(f"[Sales] {mall} SUCCESS: amount={result['total_amount']}, count={result['total_count']}")
+                        return result
                     else:
                         print(f"[Sales] No products in response for {mall}")
                 else:
