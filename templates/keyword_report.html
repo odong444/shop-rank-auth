@@ -118,27 +118,25 @@
         </div>
     </div>
 
-    <div class="analysis-grid">
-        <!-- 연관 키워드 -->
-        <div class="card">
-            <div class="card-header"><h3>🔗 연관 키워드 TOP 10</h3></div>
-            <div class="card-body">
-                <table class="keyword-table">
-                    <thead><tr><th>#</th><th>키워드</th><th>검색량</th><th>경쟁</th></tr></thead>
-                    <tbody id="relatedKeywords"></tbody>
-                </table>
-            </div>
+    <!-- 연관 키워드 -->
+    <div class="card">
+        <div class="card-header"><h3>🔗 연관 키워드 TOP 10</h3></div>
+        <div class="card-body">
+            <table class="keyword-table">
+                <thead><tr><th>#</th><th>키워드</th><th>검색량</th><th>클릭 수</th><th>클릭률</th><th>경쟁</th></tr></thead>
+                <tbody id="relatedKeywords"></tbody>
+            </table>
         </div>
+    </div>
 
-        <!-- 상위 매출 -->
-        <div class="card">
-            <div class="card-header"><h3>💰 상위 스토어 월간 매출</h3></div>
-            <div class="card-body">
-                <table class="keyword-table">
-                    <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th></tr></thead>
-                    <tbody id="topSales"></tbody>
-                </table>
-            </div>
+    <!-- 상위 매출 -->
+    <div class="card">
+        <div class="card-header"><h3>💰 상위 스토어 월간 매출</h3></div>
+        <div class="card-body">
+            <table class="keyword-table">
+                <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th></tr></thead>
+                <tbody id="topSales"></tbody>
+            </table>
         </div>
     </div>
 
@@ -391,8 +389,10 @@ function renderResults(data) {
     (data.related_keywords || []).slice(0, 10).forEach((kw, i) => {
         relatedTbody.innerHTML += `<tr>
             <td>${i+1}</td>
-            <td>${kw.keyword}</td>
+            <td><strong>${kw.keyword}</strong></td>
             <td>${formatNumber(kw.volume)}</td>
+            <td>${formatNumber(kw.clicks || 0)}</td>
+            <td>${kw.ctr ? kw.ctr + '%' : '-'}</td>
             <td>${kw.competition}</td>
         </tr>`;
     });

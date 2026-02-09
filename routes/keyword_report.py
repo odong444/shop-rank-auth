@@ -350,9 +350,17 @@ def analyze_keyword():
                     if keyword not in rel_keyword:
                         continue
                     volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
+                    clicks = parse_count(kw.get('monthlyAvePcClkCnt', 0)) + parse_count(kw.get('monthlyAveMobileClkCnt', 0))
+                    pc_ctr = kw.get('monthlyAvePcCtr', 0)
+                    mobile_ctr = kw.get('monthlyAveMobileCtr', 0)
+                    # CTR 평균 계산 (0이 아닌 값들만)
+                    ctr_values = [c for c in [pc_ctr, mobile_ctr] if c and c != '< 0.01']
+                    avg_ctr = sum(float(c) for c in ctr_values) / len(ctr_values) if ctr_values else 0
                     related.append({
                         'keyword': rel_keyword,
                         'volume': volume,
+                        'clicks': clicks,
+                        'ctr': round(avg_ctr, 2) if avg_ctr else 0,
                         'competition': kw.get('compIdx', '-')
                     })
                 related.sort(key=lambda x: x['volume'], reverse=True)
@@ -531,9 +539,16 @@ def quick_analyze():
                 if keyword not in rel_keyword:
                     continue
                 volume = parse_count(kw.get('monthlyPcQcCnt', 0)) + parse_count(kw.get('monthlyMobileQcCnt', 0))
+                clicks = parse_count(kw.get('monthlyAvePcClkCnt', 0)) + parse_count(kw.get('monthlyAveMobileClkCnt', 0))
+                pc_ctr = kw.get('monthlyAvePcCtr', 0)
+                mobile_ctr = kw.get('monthlyAveMobileCtr', 0)
+                ctr_values = [c for c in [pc_ctr, mobile_ctr] if c and c != '< 0.01']
+                avg_ctr = sum(float(c) for c in ctr_values) / len(ctr_values) if ctr_values else 0
                 related.append({
                     'keyword': rel_keyword,
                     'volume': volume,
+                    'clicks': clicks,
+                    'ctr': round(avg_ctr, 2) if avg_ctr else 0,
                     'competition': kw.get('compIdx', '-')
                 })
             related.sort(key=lambda x: x['volume'], reverse=True)
