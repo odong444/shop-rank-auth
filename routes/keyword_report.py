@@ -434,14 +434,40 @@ def fetch_sales():
         monthly_sales = []
         seen_stores = set()
 
+        def _extract_sales(sales_data, url_product_id, mall):
+            """brand-sales 응답에서 상품 매출 추출 (product_id 매칭 + 합산)"""
+            if not sales_data:
+                return None
+            products_data = sales_data.get('products', [])
+
+            if url_product_id and products_data:
+                matched = [p for p in products_data if str(p.get('product_id', '')) == url_product_id]
+                if matched:
+                    return {
+                        'amount': sum(p.get('amount', 0) for p in matched),
+                        'count': sum(p.get('count', 0) for p in matched),
+                        'clicks': sum(p.get('clicks', 0) for p in matched),
+                        'match_type': 'product'
+                    }
+
+            # fallback: 스토어 전체
+            summary = sales_data.get('summary', {})
+            if summary.get('total_amount', 0) > 0:
+                return {
+                    'amount': summary['total_amount'],
+                    'count': summary.get('total_count', 0),
+                    'clicks': summary.get('total_clicks', 0),
+                    'match_type': 'store_total'
+                }
+            return None
+
         def resolve_and_fetch(product):
-            """URL 리졸브 + 매출 조회를 한번에"""
+            """URL 리졸브 + 월간/일간 매출 조회"""
             import re
             link = product.get('link', '')
             mall = product.get('mall', '-')
             product_title = product.get('title', '')
 
-            # URL에서 상품번호 추출 (/products/5811396719)
             pid_match = re.search(r'/products/(\d+)', link)
             url_product_id = pid_match.group(1) if pid_match else ''
 
@@ -450,54 +476,39 @@ def fetch_sales():
                 print(f"[Sales] {mall}: store_url={store_url}, url_pid={url_product_id}")
                 if not store_url:
                     return None
-                # 전체 상품 매출 조회 후 product_id로 매칭
-                sales = get_brand_sales_by_url(store_url, 'monthly')
-                if sales:
-                    products_data = sales.get('products', [])
-                    print(f"[Sales] {mall}: {len(products_data)} products returned")
 
-                    if url_product_id and products_data:
-                        # 같은 product_id 찾아서 합산 (상품명 변경시 여러 행)
-                        matched = [p for p in products_data if str(p.get('product_id', '')) == url_product_id]
-                        if matched:
-                            total_amount = sum(p.get('amount', 0) for p in matched)
-                            total_count = sum(p.get('count', 0) for p in matched)
-                            total_clicks = sum(p.get('clicks', 0) for p in matched)
-                            result = {
-                                'mall': mall,
-                                'title': product_title,
-                                'store_url': store_url,
-                                'total_amount': total_amount,
-                                'total_count': total_count,
-                                'clicks': total_clicks,
-                                'match_type': 'product'
-                            }
-                            print(f"[Sales] {mall} MATCHED pid={url_product_id} ({len(matched)} rows): amount={total_amount}")
-                            return result
+                # 월간 매출
+                monthly_data = get_brand_sales_by_url(store_url, 'monthly')
+                monthly = _extract_sales(monthly_data, url_product_id, mall)
 
-                    # product_id 매칭 실패 → 스토어 전체 매출
-                    summary = sales.get('summary', {})
-                    total_amount = summary.get('total_amount', 0)
-                    if total_amount > 0:
-                        print(f"[Sales] {mall} FALLBACK store total: amount={total_amount}")
-                        return {
-                            'mall': mall,
-                            'title': product_title,
-                            'store_url': store_url,
-                            'total_amount': total_amount,
-                            'total_count': summary.get('total_count', 0),
-                            'clicks': summary.get('total_clicks', 0),
-                            'match_type': 'store_total'
-                        }
-                    else:
-                        print(f"[Sales] {mall}: no match and summary=0")
+                # 일간 매출
+                daily_data = get_brand_sales_by_url(store_url, 'daily')
+                daily = _extract_sales(daily_data, url_product_id, mall)
+
+                if monthly or daily:
+                    result = {
+                        'mall': mall,
+                        'title': product_title,
+                        'store_url': store_url,
+                        'match_type': (monthly or daily).get('match_type', 'product'),
+                    }
+                    if monthly:
+                        result['monthly_amount'] = monthly['amount']
+                        result['monthly_count'] = monthly['count']
+                    if daily:
+                        result['daily_amount'] = daily['amount']
+                        result['daily_count'] = daily['count']
+                    print(f"[Sales] {mall} OK: monthly={monthly['amount'] if monthly else 0}, daily={daily['amount'] if daily else 0}")
+                    return result
                 else:
-                    print(f"[Sales] No response for {mall}")
+                    print(f"[Sales] {mall}: no data")
+                    return None
             except Exception as e:
                 print(f"[Sales] Error for {mall}: {e}")
             return None
 
         # 병렬 리졸브 (최대 5개 동시, Cloudflare 100초 제한 대비)
+        sales_results = []
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:5]}
             try:
@@ -506,17 +517,16 @@ def fetch_sales():
                         sale = future.result()
                         if sale and sale['store_url'] not in seen_stores:
                             seen_stores.add(sale['store_url'])
-                            monthly_sales.append(sale)
-                            print(f"[Sales] Got: {sale['mall']} = {sale['total_amount']}")
-                            if len(monthly_sales) >= 5:
+                            sales_results.append(sale)
+                            if len(sales_results) >= 5:
                                 break
                     except Exception as e:
                         print(f"[Sales] Future error: {e}")
             except Exception as e:
                 print(f"[Sales] Timeout waiting for futures: {e}")
 
-        print(f"[Sales] Done: {len(monthly_sales)} results")
-        return jsonify({"success": True, "monthly_sales": monthly_sales})
+        print(f"[Sales] Done: {len(sales_results)} results")
+        return jsonify({"success": True, "sales": sales_results})
 
     except Exception as e:
         import traceback

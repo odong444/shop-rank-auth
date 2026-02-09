@@ -130,14 +130,27 @@
         </div>
     </div>
 
-    <!-- 상위 매출 -->
+    <!-- 상위 월간 매출 -->
     <div class="card">
-        <div class="card-header"><h3>💰 상위 스토어 월간 매출</h3></div>
+        <div class="card-header"><h3>💰 상위 상품 월간 매출</h3></div>
         <div class="card-body">
             <table class="keyword-table">
-                <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th></tr></thead>
-                <tbody id="topSales">
-                    <tr><td colspan="3" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
+                <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th><th>판매건수</th></tr></thead>
+                <tbody id="topMonthlySales">
+                    <tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 상위 일간 매출 -->
+    <div class="card">
+        <div class="card-header"><h3>📅 상위 상품 일간 매출</h3></div>
+        <div class="card-body">
+            <table class="keyword-table">
+                <thead><tr><th>#</th><th>스토어</th><th>일간 매출</th><th>판매건수</th></tr></thead>
+                <tbody id="topDailySales">
+                    <tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
                 </tbody>
             </table>
         </div>
@@ -276,11 +289,13 @@ async function analyzeKeyword() {
 }
 
 async function runSalesAnalysis(products) {
-    const salesTbody = document.getElementById('topSales');
-    
-    // 로딩 표시
-    salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px"><div style="display:inline-block;width:20px;height:20px;border:3px solid #f3f3f3;border-top:3px solid #667eea;border-radius:50%;animation:spin 1s linear infinite"></div> 로딩중...</td></tr>';
-    
+    const monthlyTbody = document.getElementById('topMonthlySales');
+    const dailyTbody = document.getElementById('topDailySales');
+    const loadingHtml = '<tr><td colspan="4" style="text-align:center;padding:20px"><div style="display:inline-block;width:20px;height:20px;border:3px solid #f3f3f3;border-top:3px solid #667eea;border-radius:50%;animation:spin 1s linear infinite"></div> 매출 조회중...</td></tr>';
+
+    monthlyTbody.innerHTML = loadingHtml;
+    dailyTbody.innerHTML = loadingHtml;
+
     try {
         const response = await fetch('/api/keyword-report/sales', {
             method: 'POST',
@@ -290,28 +305,58 @@ async function runSalesAnalysis(products) {
 
         const result = await response.json();
 
-        if (result.success && result.monthly_sales && result.monthly_sales.length > 0) {
+        if (result.success && result.sales && result.sales.length > 0) {
             updateProgress(3, 'done');
-            // 매출 데이터 렌더링
-            salesTbody.innerHTML = '';
-            result.monthly_sales.forEach((s, i) => {
-                const matchLabel = s.match_type === 'store_total' ? '<span style="color:#f39c12;font-size:11px">(스토어 전체)</span>' : '';
-                const productName = s.product_name ? `<small style="color:#667eea">${s.product_name.substring(0, 40)}</small><br>` : '';
-                salesTbody.innerHTML += `<tr>
-                    <td>${i+1}</td>
-                    <td>${s.mall} ${matchLabel}<br>${productName}<small style="color:#888">${s.title || ''}</small></td>
-                    <td>${formatNumber(s.total_amount)}원<br><small style="color:#888">${formatNumber(s.total_count || 0)}건</small></td>
-                </tr>`;
-            });
-            if (currentData) currentData.monthly_sales = result.monthly_sales;
+            const sales = result.sales;
+
+            // 월간 매출 렌더링
+            const hasMonthly = sales.some(s => s.monthly_amount > 0);
+            if (hasMonthly) {
+                monthlyTbody.innerHTML = '';
+                sales.filter(s => s.monthly_amount > 0)
+                    .sort((a, b) => b.monthly_amount - a.monthly_amount)
+                    .forEach((s, i) => {
+                    const matchLabel = s.match_type === 'store_total' ? ' <span style="color:#f39c12;font-size:11px">(스토어 전체)</span>' : '';
+                    monthlyTbody.innerHTML += `<tr>
+                        <td>${i+1}</td>
+                        <td>${s.mall}${matchLabel}<br><small style="color:#888">${s.title || ''}</small></td>
+                        <td style="text-align:right">${formatNumber(s.monthly_amount)}원</td>
+                        <td style="text-align:right">${formatNumber(s.monthly_count || 0)}건</td>
+                    </tr>`;
+                });
+            } else {
+                monthlyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#888">월간 매출 데이터 없음</td></tr>';
+            }
+
+            // 일간 매출 렌더링
+            const hasDaily = sales.some(s => s.daily_amount > 0);
+            if (hasDaily) {
+                dailyTbody.innerHTML = '';
+                sales.filter(s => s.daily_amount > 0)
+                    .sort((a, b) => b.daily_amount - a.daily_amount)
+                    .forEach((s, i) => {
+                    const matchLabel = s.match_type === 'store_total' ? ' <span style="color:#f39c12;font-size:11px">(스토어 전체)</span>' : '';
+                    dailyTbody.innerHTML += `<tr>
+                        <td>${i+1}</td>
+                        <td>${s.mall}${matchLabel}<br><small style="color:#888">${s.title || ''}</small></td>
+                        <td style="text-align:right">${formatNumber(s.daily_amount)}원</td>
+                        <td style="text-align:right">${formatNumber(s.daily_count || 0)}건</td>
+                    </tr>`;
+                });
+            } else {
+                dailyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#888">일간 매출 데이터 없음</td></tr>';
+            }
+
+            if (currentData) currentData.sales = result.sales;
         } else {
             updateProgress(3, 'done');
-            salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>';
-            console.log('매출 데이터 없음');
+            monthlyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>';
+            dailyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>';
         }
     } catch(e) {
         updateProgress(3, 'done');
-        salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#e74c3c">매출 조회 오류</td></tr>';
+        monthlyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#e74c3c">매출 조회 오류</td></tr>';
+        dailyTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#e74c3c">매출 조회 오류</td></tr>';
         console.error('매출 조회 오류:', e);
     }
 }
@@ -408,19 +453,7 @@ function renderResults(data) {
         </tr>`;
     });
 
-    // 상위 매출
-    const salesTbody = document.getElementById('topSales');
-    salesTbody.innerHTML = '';
-    (data.monthly_sales || []).forEach((s, i) => {
-        salesTbody.innerHTML += `<tr>
-            <td>${i+1}</td>
-            <td>${s.mall}</td>
-            <td>${formatNumber(s.total_amount)}원</td>
-        </tr>`;
-    });
-    if (!data.monthly_sales?.length) {
-        salesTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888">매출 데이터 없음</td></tr>';
-    }
+    // 매출은 별도 비동기 호출 (runSalesAnalysis)에서 렌더링
 
     // 결과 영역으로 스크롤
     document.getElementById('resultSection').scrollIntoView({behavior: 'smooth'});
