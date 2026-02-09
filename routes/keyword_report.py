@@ -443,11 +443,10 @@ def fetch_sales():
                 if not store_url:
                     return None
                 sales = get_brand_sales_by_url(store_url, 'monthly', product_id)
-                if sales and sales.get('success'):
-                    # 해당 상품의 매출만 추출
+                if sales:
+                    # RANK API 응답: {mall_sequence, period, products: [...]}
                     products_data = sales.get('products', [])
                     if products_data:
-                        # 첫 번째 상품이 해당 product_id (이미 필터링됨)
                         product_sales = products_data[0]
                         return {
                             'mall': mall,
@@ -458,10 +457,9 @@ def fetch_sales():
                             'clicks': product_sales.get('clicks', 0)
                         }
                     else:
-                        print(f"[Sales] No sales data for product {product_id}")
+                        print(f"[Sales] No products in response for {mall}")
                 else:
-                    error_msg = sales.get('error', 'unknown') if sales else 'no response'
-                    print(f"[Sales] No data for {mall}: {error_msg}")
+                    print(f"[Sales] No response for {mall}")
             except Exception as e:
                 print(f"[Sales] Error for {mall}: {e}")
             return None
