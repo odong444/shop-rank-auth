@@ -438,32 +438,31 @@ def fetch_sales():
             """URL 리졸브 + 매출 조회를 한번에"""
             link = product.get('link', '')
             mall = product.get('mall', '-')
-            product_id = product.get('productId', '')
             product_title = product.get('title', '')
             try:
                 store_url = extract_store_url(link)
-                print(f"[Sales] {mall}: store_url={store_url}, product_id={product_id}")
+                print(f"[Sales] {mall}: store_url={store_url}")
                 if not store_url:
                     return None
-                sales = get_brand_sales_by_url(store_url, 'monthly', product_id)
-                print(f"[Sales] {mall} brand-sales response: {json.dumps(sales, ensure_ascii=False)[:300] if sales else 'None'}")
+                # product_id 없이 호출 → 스토어 전체 매출 조회
+                sales = get_brand_sales_by_url(store_url, 'monthly')
                 if sales:
-                    # RANK API 응답: {mall_sequence, period, products: [...]}
-                    products_data = sales.get('products', [])
-                    if products_data:
-                        product_sales = products_data[0]
+                    summary = sales.get('summary', {})
+                    total_amount = summary.get('total_amount', 0)
+                    total_count = summary.get('total_count', 0)
+                    if total_amount > 0:
                         result = {
                             'mall': mall,
                             'title': product_title,
                             'store_url': store_url,
-                            'total_amount': product_sales.get('amount', 0),
-                            'total_count': product_sales.get('count', 0),
-                            'clicks': product_sales.get('clicks', 0)
+                            'total_amount': total_amount,
+                            'total_count': total_count,
+                            'clicks': summary.get('total_clicks', 0)
                         }
-                        print(f"[Sales] {mall} SUCCESS: amount={result['total_amount']}, count={result['total_count']}")
+                        print(f"[Sales] {mall} SUCCESS: amount={total_amount}, count={total_count}")
                         return result
                     else:
-                        print(f"[Sales] No products in response for {mall}")
+                        print(f"[Sales] {mall}: summary amount=0")
                 else:
                     print(f"[Sales] No response for {mall}")
             except Exception as e:
