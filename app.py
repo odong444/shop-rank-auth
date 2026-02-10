@@ -15,6 +15,7 @@ from routes.brand_sales import brand_sales_bp
 from routes.admin import admin_bp
 from routes.coupang import coupang_bp
 from routes.keyword_report import keyword_report_bp
+from routes.place_rank import place_rank_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
@@ -28,6 +29,7 @@ app.register_blueprint(brand_sales_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(coupang_bp)
 app.register_blueprint(keyword_report_bp)
+app.register_blueprint(place_rank_bp)
 
 
 @app.route('/')

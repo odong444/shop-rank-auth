@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+
+{% block title %}플레이스 순위{% endblock %}
+
+{% block extra_css %}
+<style>
+.section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-dark);
+}
+.input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.input-row .input {
+    flex: 1;
+}
+.divider {
+    border-bottom: 1px dashed var(--border);
+    margin: 12px 0;
+}
+.file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.file-input {
+    flex: 1;
+    min-width: 150px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+.btn-sm {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+}
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-gray);
+}
+.btn-outline:hover {
+    background: var(--bg-gray);
+}
+.btn-danger {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+.btn-danger:hover {
+    background: #FECACA;
+}
+.selected-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #FEF3C7;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.813rem;
+}
+.action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.action-btns {
+    display: flex;
+    gap: 8px;
+}
+.table-wrap {
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px;
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    min-width: 600px;
+}
+.data-table th, .data-table td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.data-table th {
+    font-weight: 600;
+    color: var(--text-gray);
+    background: var(--bg-gray);
+    position: sticky;
+    top: 0;
+}
+.data-table tr:hover {
+    background: var(--bg-gray);
+}
+.rank-up {
+    color: #10B981;
+    font-weight: 600;
+}
+.rank-down {
+    color: #EF4444;
+    font-weight: 600;
+}
+.action-cell {
+    display: flex;
+    gap: 4px;
+}
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.625rem;
+    border-radius: 4px;
+}
+.empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text-gray);
+}
+.checkbox-cell {
+    width: 32px;
+}
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+}
+.hint {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-top: 8px;
+}
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.modal-overlay.hidden {
+    display: none;
+}
+.modal-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    width: 90%;
+    max-width: 360px;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.modal-box .data-table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+}
+.modal-box .data-table th,
+.modal-box .data-table td {
+    padding: 10px 8px;
+    text-align: center;
+    word-break: break-all;
+}
+.modal-box .data-table th:first-child,
+.modal-box .data-table td:first-child {
+    width: 65%;
+}
+.modal-box .data-table th:last-child,
+.modal-box .data-table td:last-child {
+    width: 35%;
+}
+.modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-gray);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 플레이스 등록 -->
+<div class="card">
+    <div class="section-title">플레이스 등록</div>
+
+    <div class="input-row">
+        <input type="text" id="keyword" placeholder="검색 키워드 (예: 강남역 카페)" class="input">
+        <input type="text" id="placeId" placeholder="플레이스 ID" class="input">
+        <button onclick="addPlace()" id="addBtn" class="btn btn-primary btn-sm">등록</button>
+    </div>
+
+    <div class="file-row">
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" class="file-input">
+        <button onclick="bulkUpload()" id="bulkBtn" class="btn btn-outline btn-sm">대량등록</button>
+        <button onclick="downloadSample()" class="btn btn-outline btn-sm">샘플</button>
+    </div>
+
+    <p class="hint">* 플레이스 ID 확인: 네이버 지도에서 업체 검색 → URL의 숫자 부분 (예: place.naver.com/restaurant/1286027343)</p>
+</div>
+
+<!-- 선택 정보 -->
+<div id="selectedInfo" class="selected-bar hidden">
+    <span><strong id="selectedCount">0</strong>개 선택</span>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelected()">선택 삭제</button>
+</div>
+
+<!-- 플레이스 목록 -->
+<div class="card">
+    <div class="action-row">
+        <div class="section-title" style="margin:0">플레이스 목록 <span id="placeCount" style="color:var(--primary)"></span></div>
+        <div class="action-btns">
+            <button class="btn btn-outline btn-sm" onclick="exportExcel()">엑셀</button>
+            <button class="btn btn-primary btn-sm" onclick="refreshAll()" id="refreshBtn">새로고침</button>
+        </div>
+    </div>
+
+    <!-- 로딩 -->
+    <div id="loading" class="flex flex-col items-center py-8">
+        <div class="spinner"></div>
+        <p class="mt-4 text-sm text-gray">로딩 중...</p>
+    </div>
+
+    <!-- 테이블 -->
+    <div id="tableContainer" class="table-wrap hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                    <th>업체명</th>
+                    <th>키워드</th>
+                    <th>플레이스 ID</th>
+                    <th>최초</th>
+                    <th>이전</th>
+                    <th>현재</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="placeBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 빈 상태 -->
+    <div id="empty" class="empty-state hidden">
+        <p>등록된 플레이스가 없습니다</p>
+    </div>
+</div>
+
+<!-- 이력 모달 -->
+<div id="historyModal" class="modal-overlay hidden" onclick="closeHistoryModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-title">순위 변동 이력</div>
+        <p id="historyTitle" class="text-sm text-gray mb-3"></p>
+        <table class="data-table">
+            <thead><tr><th>날짜/시간</th><th>순위</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+        <button class="btn btn-outline w-full mt-4" onclick="closeHistoryModal()">닫기</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let places = [];
+let selectedIds = new Set();
+
+function formatRank(rank) {
+    if (!rank || rank === '-' || rank === 'loading') return '-';
+    if (rank === '300위 밖') return rank;
+    return rank + '위';
+}
+
+async function loadPlaces() {
+    try {
+        const r = await fetch('/api/place-rank/places');
+        const d = await r.json();
+        document.getElementById('loading').classList.add('hidden');
+
+        if (d.success && d.places.length > 0) {
+            places = d.places;
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('empty').classList.add('hidden');
+            document.getElementById('placeCount').textContent = `(${d.places.length}개)`;
+            selectedIds.clear();
+            updateSelectedInfo();
+            renderTable();
+            checkPendingRanks();
+        } else {
+            places = [];
+            document.getElementById('tableContainer').classList.add('hidden');
+            document.getElementById('empty').classList.remove('hidden');
+            document.getElementById('placeCount').textContent = '(0개)';
+        }
+    } catch(e) {
+        document.getElementById('loading').innerHTML = '<p style="color:#EF4444">로드 실패</p>';
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('placeBody');
+    tbody.innerHTML = '';
+
+    places.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.id = 'row-' + p.id;
+        const isChecked = selectedIds.has(p.id) ? 'checked' : '';
+
+        let todayHtml = p.current_rank === '-' || p.current_rank === 'loading'
+            ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
+            : formatRank(p.current_rank);
+
+        if (p.prev_rank && p.prev_rank !== '-' && p.current_rank && p.current_rank !== '-' && p.current_rank !== '300위 밖' && p.current_rank !== 'loading') {
+            const prev = parseInt(p.prev_rank), curr = parseInt(p.current_rank);
+            if (!isNaN(prev) && !isNaN(curr)) {
+                const diff = prev - curr;
+                if (diff > 0) todayHtml += ` <span class="rank-up">▲${diff}</span>`;
+                else if (diff < 0) todayHtml += ` <span class="rank-down">▼${Math.abs(diff)}</span>`;
+            }
+        }
+
+        let firstHtml = p.first_rank === '-' || p.first_rank === 'loading'
+            ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
+            : formatRank(p.first_rank);
+
+        tr.innerHTML = `
+            <td class="checkbox-cell"><input type="checkbox" ${isChecked} onchange="toggleSelect(${p.id})"></td>
+            <td id="title-${p.id}" class="truncate" style="max-width:120px" title="${p.title || ''}">${p.title || '-'}</td>
+            <td>${p.keyword}</td>
+            <td>${p.place_id}</td>
+            <td id="first-${p.id}">${firstHtml}</td>
+            <td>${formatRank(p.prev_rank)}</td>
+            <td id="rank-${p.id}">${todayHtml}</td>
+            <td class="action-cell">
+                <button class="btn btn-outline btn-xs" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
+                <button class="btn btn-danger btn-xs" onclick="deletePlace(${p.id})">삭제</button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('selectAll').checked = selectedIds.size === places.length && places.length > 0;
+}
+
+function toggleSelect(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    updateSelectedInfo();
+    document.getElementById('selectAll').checked = selectedIds.size === places.length && places.length > 0;
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    if (checked) places.forEach(p => selectedIds.add(p.id));
+    else selectedIds.clear();
+    updateSelectedInfo();
+    renderTable();
+}
+
+function updateSelectedInfo() {
+    const info = document.getElementById('selectedInfo');
+    const count = document.getElementById('selectedCount');
+    count.textContent = selectedIds.size;
+    if (selectedIds.size > 0) info.classList.remove('hidden');
+    else info.classList.add('hidden');
+}
+
+async function deleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}개 삭제?`)) return;
+
+    try {
+        const r = await fetch('/api/place-rank/bulk-delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids: Array.from(selectedIds)})
+        });
+        const d = await r.json();
+        if (d.success) {
+            selectedIds.clear();
+            loadPlaces();
+        } else alert(d.message);
+    } catch(e) {
+        alert('서버 연결 실패');
+    }
+}
+
+async function checkPendingRanks() {
+    for (const p of places) {
+        if (p.current_rank === '-' || p.current_rank === 'loading') {
+            await checkSingleRank(p.id);
+            await new Promise(r => setTimeout(r, 300));
+        }
+    }
+}
+
+async function checkSingleRank(pid) {
+    try {
+        const r = await fetch('/api/place-rank/check/' + pid, {method: 'POST'});
+        const d = await r.json();
+
+        if (d.success) {
+            const p = places.find(x => x.id === pid);
+            if (p) {
+                p.current_rank = d.rank;
+                p.first_rank = d.first_rank;
+                p.title = d.title || p.title;
+            }
+
+            const rankCell = document.getElementById('rank-' + pid);
+            const firstCell = document.getElementById('first-' + pid);
+            const titleCell = document.getElementById('title-' + pid);
+            
+            if (rankCell) rankCell.innerHTML = formatRank(d.rank);
+            if (firstCell) firstCell.innerHTML = formatRank(d.first_rank);
+            if (titleCell) {
+                titleCell.textContent = d.title || '-';
+                titleCell.title = d.title || '';
+            }
+        }
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+async function addPlace() {
+    const keyword = document.getElementById('keyword').value.trim();
+    const placeId = document.getElementById('placeId').value.trim();
+    const btn = document.getElementById('addBtn');
+
+    if (!keyword || !placeId) { alert('키워드와 플레이스 ID를 입력해주세요.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = '등록중...';
+
+    try {
+        const r = await fetch('/api/place-rank/places', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({keyword, place_id: placeId})
+        });
+        const d = await r.json();
+
+        if (d.success) {
+            document.getElementById('keyword').value = '';
+            document.getElementById('placeId').value = '';
+            await loadPlaces();
+        } else alert(d.message);
+    } catch(e) {
+        alert('서버 연결 실패');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '등록';
+    }
+}
+
+async function bulkUpload() {
+    const fileInput = document.getElementById('excelFile');
+    const btn = document.getElementById('bulkBtn');
+
+    if (!fileInput.files[0]) { alert('파일을 선택해주세요.'); return; }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    btn.disabled = true;
+    btn.textContent = '업로드중...';
+
+    try {
+        const r = await fetch('/api/place-rank/bulk-upload', {method: 'POST', body: formData});
+        const d = await r.json();
+
+        if (d.success) {
+            alert(`${d.count}개 등록 완료`);
+            fileInput.value = '';
+            await loadPlaces();
+        } else alert(d.message);
+    } catch(e) {
+        alert('업로드 실패');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '대량등록';
+    }
+}
+
+function downloadSample() {
+    window.location.href = '/api/place-rank/sample-excel';
+}
+
+async function deletePlace(id) {
+    if (!confirm('삭제하시겠습니까?')) return;
+
+    try {
+        const r = await fetch('/api/place-rank/places/' + id, {method: 'DELETE'});
+        const d = await r.json();
+        if (d.success) loadPlaces();
+        else alert(d.message);
+    } catch(e) {
+        alert('서버 연결 실패');
+    }
+}
+
+async function refreshAll() {
+    if (!confirm('전체 순위를 새로고침?')) return;
+
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = '조회중...';
+
+    try {
+        const r = await fetch('/api/place-rank/refresh', {method: 'POST'});
+        const d = await r.json();
+        if (d.success) {
+            alert(`${d.updated}개 플레이스 조회 완료`);
+            loadPlaces();
+        } else alert(d.message);
+    } catch(e) {
+        alert('서버 연결 실패');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '새로고침';
+    }
+}
+
+async function showHistory(pid, kw) {
+    try {
+        const r = await fetch('/api/place-rank/history/' + pid);
+        const d = await r.json();
+        document.getElementById('historyTitle').textContent = '키워드: ' + kw;
+
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = '';
+
+        if (d.success && d.history.length > 0) {
+            d.history.forEach(h => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${h.checked_at}</td><td>${formatRank(h.rank)}</td>`;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-gray)">이력 없음</td></tr>';
+        }
+
+        document.getElementById('historyModal').classList.remove('hidden');
+    } catch(e) {
+        alert('이력 조회 실패');
+    }
+}
+
+function closeHistoryModal(e) {
+    if (!e || e.target === e.currentTarget) {
+        document.getElementById('historyModal').classList.add('hidden');
+    }
+}
+
+function exportExcel() {
+    if (places.length === 0) { alert('데이터가 없습니다.'); return; }
+    window.location.href = '/api/place-rank/export';
+}
+
+document.getElementById('placeId').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') addPlace();
+});
+
+loadPlaces();
+</script>
+{% endblock %}
