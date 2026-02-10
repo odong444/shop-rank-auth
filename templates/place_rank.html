@@ -208,6 +208,7 @@ input[type="checkbox"] {
     <div class="input-row">
         <input type="text" id="keyword" placeholder="검색 키워드 (예: 강남역 카페)" class="input">
         <input type="text" id="placeId" placeholder="플레이스 ID" class="input">
+        <input type="text" id="placeName" placeholder="업체명" class="input">
         <button onclick="addPlace()" id="addBtn" class="btn btn-primary btn-sm">등록</button>
     </div>
 
@@ -217,7 +218,7 @@ input[type="checkbox"] {
         <button onclick="downloadSample()" class="btn btn-outline btn-sm">샘플</button>
     </div>
 
-    <p class="hint">* 플레이스 ID 확인: 네이버 지도에서 업체 검색 → URL의 숫자 부분 (예: place.naver.com/restaurant/1286027343)<br>* 순위 체크 범위: 200위까지</p>
+    <p class="hint">* 플레이스 ID 확인: 네이버 지도에서 업체 검색 → URL의 숫자 부분 (예: place.naver.com/restaurant/1286027343)<br>* 업체명은 선택 입력 (입력하지 않으면 빈칸으로 표시)<br>* 순위 체크 범위: 200위까지</p>
 </div>
 
 <!-- 선택 정보 -->
@@ -446,6 +447,7 @@ async function checkSingleRank(pid) {
 async function addPlace() {
     const keyword = document.getElementById('keyword').value.trim();
     const placeId = document.getElementById('placeId').value.trim();
+    const placeName = document.getElementById('placeName').value.trim();
     const btn = document.getElementById('addBtn');
 
     if (!keyword || !placeId) { alert('키워드와 플레이스 ID를 입력해주세요.'); return; }
@@ -457,13 +459,14 @@ async function addPlace() {
         const r = await fetch('/api/place-rank/places', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({keyword, place_id: placeId})
+            body: JSON.stringify({keyword, place_id: placeId, title: placeName})
         });
         const d = await r.json();
 
         if (d.success) {
             document.getElementById('keyword').value = '';
             document.getElementById('placeId').value = '';
+            document.getElementById('placeName').value = '';
             await loadPlaces();
         } else alert(d.message);
     } catch(e) {

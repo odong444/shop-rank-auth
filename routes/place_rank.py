@@ -72,6 +72,7 @@ def add_place():
     d = request.json
     keyword = d.get('keyword', '').strip()
     place_id = d.get('place_id', '').strip()
+    title = d.get('title', '').strip()
     
     if not keyword or not place_id:
         return jsonify({'success': False, 'message': '키워드와 플레이스 ID를 입력해주세요.'})
@@ -91,11 +92,11 @@ def add_place():
             conn.close()
             return jsonify({'success': False, 'message': '이미 등록된 플레이스입니다.'})
         
-        # 등록 (순위는 나중에 조회)
+        # 등록 (업체명 포함)
         cur.execute('''
             INSERT INTO place_ranks (user_id, place_id, keyword, title, first_rank, prev_rank, current_rank)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (session['user_id'], place_id, keyword, '', '-', '-', '-'))
+        ''', (session['user_id'], place_id, keyword, title, '-', '-', '-'))
         conn.commit()
         cur.close()
         conn.close()
@@ -153,7 +154,7 @@ def check_single_rank(pid):
         conn = get_db()
         cur = conn.cursor()
         cur.execute('''
-            SELECT place_id, keyword, first_rank 
+            SELECT place_id, keyword, first_rank, title 
             FROM place_ranks 
             WHERE id=%s AND user_id=%s
         ''', (pid, session['user_id']))
@@ -164,7 +165,7 @@ def check_single_rank(pid):
             conn.close()
             return jsonify({'success': False, 'message': '플레이스를 찾을 수 없습니다.'})
         
-        place_id, keyword, first_rank = row
+        place_id, keyword, first_rank, existing_title = row
         
         # 순위 체크 로직 (Python 스크립트 호출)
         from utils.naver_place import check_place_rank
@@ -176,12 +177,15 @@ def check_single_rank(pid):
         if first_rank == '-':
             first_rank = rank_str
         
+        # 업체명: 기존 값이 있으면 유지, 없으면 새로 가져온 값 사용
+        final_title = existing_title if existing_title else (title or '')
+        
         # DB 업데이트
         cur.execute('''
             UPDATE place_ranks 
             SET title=%s, first_rank=%s, current_rank=%s, last_checked=NOW()
             WHERE id=%s
-        ''', (title or '', first_rank, rank_str, pid))
+        ''', (final_title, first_rank, rank_str, pid))
         
         # 이력 저장
         cur.execute('''
@@ -230,20 +234,23 @@ def refresh_ranks():
                 conn = get_db()
                 cur = conn.cursor()
                 
-                # 현재 순위 가져오기
-                cur.execute('SELECT first_rank, current_rank FROM place_ranks WHERE id=%s', (pid,))
-                first_rank, prev_rank = cur.fetchone()
+                # 현재 순위 및 기존 업체명 가져오기
+                cur.execute('SELECT first_rank, current_rank, title FROM place_ranks WHERE id=%s', (pid,))
+                first_rank, prev_rank, existing_title = cur.fetchone()
                 
                 # 최초 순위 설정
                 if first_rank == '-':
                     first_rank = rank_str
+                
+                # 업체명: 기존 값이 있으면 유지, 없으면 새로 가져온 값 사용
+                final_title = existing_title if existing_title else (title or '')
                 
                 # 업데이트
                 cur.execute('''
                     UPDATE place_ranks
                     SET title=%s, first_rank=%s, prev_rank=%s, current_rank=%s, last_checked=NOW()
                     WHERE id=%s
-                ''', (title or '', first_rank, prev_rank, rank_str, pid))
+                ''', (final_title, first_rank, prev_rank, rank_str, pid))
                 
                 # 이력 저장
                 cur.execute('''
@@ -324,6 +331,7 @@ def bulk_upload():
         for _, row in df.iterrows():
             keyword = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
             place_id = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ''
+            title = str(row.iloc[2]).strip() if len(row) > 2 and pd.notna(row.iloc[2]) else ''
             
             if keyword and place_id and keyword != '키워드':
                 cur.execute('''
@@ -335,7 +343,7 @@ def bulk_upload():
                     cur.execute('''
                         INSERT INTO place_ranks (user_id, place_id, keyword, title, first_rank, prev_rank, current_rank)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ''', (session['user_id'], place_id, keyword, '', '-', '-', '-'))
+                    ''', (session['user_id'], place_id, keyword, title, '-', '-', '-'))
                     count += 1
         
         conn.commit()
@@ -352,10 +360,10 @@ def sample_excel():
     """샘플 엑셀 다운로드"""
     output = io.StringIO()
     w = csv.writer(output)
-    w.writerow(['키워드', '플레이스ID'])
-    w.writerow(['강남역 카페', '12948226'])
-    w.writerow(['홍대 맛집', '37420517'])
-    w.writerow(['신촌 치킨', '11111111'])
+    w.writerow(['키워드', '플레이스ID', '업체명'])
+    w.writerow(['강남역 카페', '12948226', '스타벅스 강남역점'])
+    w.writerow(['홍대 맛집', '37420517', '홍대 맛집'])
+    w.writerow(['신촌 치킨', '11111111', '치킨집'])
     output.seek(0)
     return Response('\ufeff' + output.getvalue(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=place_rank_sample.csv'})
