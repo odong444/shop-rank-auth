@@ -64,6 +64,7 @@ def check_place_rank(keyword, place_id, max_results=300):
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
+            response.encoding = 'utf-8'
             ids = extract_place_ids_from_html(response.text)
             place_ids.extend(ids)
     except Exception as e:
@@ -76,6 +77,7 @@ def check_place_rank(keyword, place_id, max_results=300):
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
+            response.encoding = 'utf-8'
             ids = extract_place_ids_from_html(response.text)
             
             # 중복 제거하면서 추가
@@ -117,6 +119,9 @@ def get_place_title(place_id):
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
+            # UTF-8 인코딩 명시
+            response.encoding = 'utf-8'
+            
             # <title> 태그에서 업체명 추출
             match = re.search(r'<title>([^<]+)</title>', response.text)
             if match:
