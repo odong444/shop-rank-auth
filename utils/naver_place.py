@@ -5,6 +5,7 @@
 import requests
 from urllib.parse import quote
 import re
+from datetime import datetime
 
 
 def extract_place_ids_from_html(html):
@@ -36,7 +37,33 @@ def extract_place_ids_from_html(html):
     return unique_ids
 
 
-def check_place_rank(keyword, place_id, max_results=300):
+def save_keyword_snapshot(keyword, place_data_list):
+    """
+    키워드 검색 결과를 스냅샷으로 저장
+    
+    Args:
+        keyword: 검색 키워드
+        place_data_list: [(place_id, rank, title), ...] 리스트
+    """
+    try:
+        from utils.db import get_db
+        conn = get_db()
+        cur = conn.cursor()
+        
+        for place_id, rank, title in place_data_list:
+            cur.execute('''
+                INSERT INTO place_keyword_snapshots (keyword, place_id, rank, title)
+                VALUES (%s, %s, %s, %s)
+            ''', (keyword, place_id, rank, title or ''))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"Snapshot save error: {e}")
+
+
+def check_place_rank(keyword, place_id, max_results=200):
     """
     네이버 플레이스 순위 체크
     
@@ -111,6 +138,19 @@ def check_place_rank(keyword, place_id, max_results=300):
             unique_place_ids.append(pid)
     
     place_ids = unique_place_ids[:max_results]
+    
+    # 스냅샷 저장용 데이터 준비
+    snapshot_data = []
+    for rank, pid in enumerate(place_ids, start=1):
+        title = place_data.get(pid, '')
+        snapshot_data.append((pid, rank, title))
+    
+    # 키워드 검색 결과 스냅샷 저장 (비동기로 저장)
+    if snapshot_data:
+        try:
+            save_keyword_snapshot(keyword, snapshot_data)
+        except Exception as e:
+            print(f"Snapshot save failed: {e}")
     
     # 순위 찾기
     for rank, pid in enumerate(place_ids, start=1):

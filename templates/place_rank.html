@@ -217,7 +217,7 @@ input[type="checkbox"] {
         <button onclick="downloadSample()" class="btn btn-outline btn-sm">샘플</button>
     </div>
 
-    <p class="hint">* 플레이스 ID 확인: 네이버 지도에서 업체 검색 → URL의 숫자 부분 (예: place.naver.com/restaurant/1286027343)</p>
+    <p class="hint">* 플레이스 ID 확인: 네이버 지도에서 업체 검색 → URL의 숫자 부분 (예: place.naver.com/restaurant/1286027343)<br>* 순위 체크 범위: 200위까지</p>
 </div>
 
 <!-- 선택 정보 -->
@@ -288,7 +288,7 @@ let selectedIds = new Set();
 
 function formatRank(rank) {
     if (!rank || rank === '-' || rank === 'loading') return '-';
-    if (rank === '300위 밖') return rank;
+    if (rank === '200위 밖' || rank === '300위 밖') return rank;
     return rank + '위';
 }
 
@@ -331,7 +331,7 @@ function renderTable() {
             ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
             : formatRank(p.current_rank);
 
-        if (p.prev_rank && p.prev_rank !== '-' && p.current_rank && p.current_rank !== '-' && p.current_rank !== '300위 밖' && p.current_rank !== 'loading') {
+        if (p.prev_rank && p.prev_rank !== '-' && p.current_rank && p.current_rank !== '-' && p.current_rank !== '200위 밖' && p.current_rank !== '300위 밖' && p.current_rank !== 'loading') {
             const prev = parseInt(p.prev_rank), curr = parseInt(p.current_rank);
             if (!isNaN(prev) && !isNaN(curr)) {
                 const diff = prev - curr;

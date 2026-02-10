@@ -109,6 +109,23 @@ def init_db():
         rank VARCHAR(20) NOT NULL,
         checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
+    # place_keyword_snapshots 테이블 (키워드 검색 결과 영구 저장)
+    cur.execute('''CREATE TABLE IF NOT EXISTS place_keyword_snapshots (
+        id SERIAL PRIMARY KEY,
+        keyword VARCHAR(100) NOT NULL,
+        place_id VARCHAR(50) NOT NULL,
+        rank INTEGER NOT NULL,
+        title VARCHAR(500),
+        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # 인덱스 생성
+    try:
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_place_keyword_checked ON place_keyword_snapshots(keyword, checked_at)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_place_place_id ON place_keyword_snapshots(place_id)')
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     conn.commit()
     
     # 기존 테이블에 새 컬럼 추가

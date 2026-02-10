@@ -168,9 +168,9 @@ def check_single_rank(pid):
         
         # 순위 체크 로직 (Python 스크립트 호출)
         from utils.naver_place import check_place_rank
-        rank, title = check_place_rank(keyword, place_id)
+        rank, title = check_place_rank(keyword, place_id, max_results=200)
         
-        rank_str = str(rank) if rank else '300위 밖'
+        rank_str = str(rank) if rank else '200위 밖'
         
         # 최초 순위 설정
         if first_rank == '-':
@@ -224,8 +224,8 @@ def refresh_ranks():
         
         for pid, place_id, keyword in rows:
             try:
-                rank, title = check_place_rank(keyword, place_id)
-                rank_str = str(rank) if rank else '300위 밖'
+                rank, title = check_place_rank(keyword, place_id, max_results=200)
+                rank_str = str(rank) if rank else '200위 밖'
                 
                 conn = get_db()
                 cur = conn.cursor()
