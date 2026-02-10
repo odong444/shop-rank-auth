@@ -77,31 +77,65 @@
     display: flex;
     gap: 8px;
 }
-.table-wrap {
-    overflow-x: auto;
-    margin: 0 -16px;
-    padding: 0 16px;
+.place-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
 }
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.75rem;
-    min-width: 600px;
+.place-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
 }
-.data-table th, .data-table td {
-    padding: 10px 8px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
+.place-card-checkbox {
+    margin-top: 2px;
 }
-.data-table th {
+.place-card-title {
+    flex: 1;
+    font-size: 0.938rem;
     font-weight: 600;
-    color: var(--text-gray);
-    background: var(--bg-gray);
-    position: sticky;
-    top: 0;
+    color: var(--text-dark);
+    margin-bottom: 4px;
 }
-.data-table tr:hover {
-    background: var(--bg-gray);
+.place-card-keyword {
+    font-size: 0.813rem;
+    color: var(--text-gray);
+}
+.place-card-id {
+    font-size: 0.688rem;
+    color: #94A3B8;
+    margin-top: 2px;
+}
+.place-card-ranks {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin: 10px 0;
+}
+.rank-item {
+    flex: 1;
+    text-align: center;
+}
+.rank-item-label {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-bottom: 4px;
+}
+.rank-item-value {
+    font-size: 0.938rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+.place-card-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
 }
 .rank-up {
     color: #10B981;
@@ -245,24 +279,16 @@ input[type="checkbox"] {
         <p class="mt-4 text-sm text-gray">로딩 중...</p>
     </div>
 
-    <!-- 테이블 -->
-    <div id="tableContainer" class="table-wrap hidden">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                    <th>업체명</th>
-                    <th>키워드</th>
-                    <th>플레이스 ID</th>
-                    <th>최초</th>
-                    <th>이전</th>
-                    <th>현재</th>
-                    <th>관리</th>
-                </tr>
-            </thead>
-            <tbody id="placeBody"></tbody>
-        </table>
+    <!-- 전체 선택 -->
+    <div id="selectAllContainer" class="hidden" style="padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.813rem; color: var(--text-gray);">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+            전체 선택
+        </label>
     </div>
+
+    <!-- 카드 목록 -->
+    <div id="placeCards" class="hidden"></div>
 
     <!-- 빈 상태 -->
     <div id="empty" class="empty-state hidden">
@@ -303,16 +329,18 @@ async function loadPlaces() {
 
         if (d.success && d.places.length > 0) {
             places = d.places;
-            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('selectAllContainer').classList.remove('hidden');
+            document.getElementById('placeCards').classList.remove('hidden');
             document.getElementById('empty').classList.add('hidden');
             document.getElementById('placeCount').textContent = `(${d.places.length}개)`;
             selectedIds.clear();
             updateSelectedInfo();
-            renderTable();
+            renderCards();
             checkPendingRanks();
         } else {
             places = [];
-            document.getElementById('tableContainer').classList.add('hidden');
+            document.getElementById('selectAllContainer').classList.add('hidden');
+            document.getElementById('placeCards').classList.add('hidden');
             document.getElementById('empty').classList.remove('hidden');
             document.getElementById('placeCount').textContent = '(0개)';
         }
@@ -321,45 +349,70 @@ async function loadPlaces() {
     }
 }
 
-function renderTable() {
-    const tbody = document.getElementById('placeBody');
-    tbody.innerHTML = '';
+function renderCards() {
+    const container = document.getElementById('placeCards');
+    container.innerHTML = '';
 
     places.forEach(p => {
-        const tr = document.createElement('tr');
-        tr.id = 'row-' + p.id;
         const isChecked = selectedIds.has(p.id) ? 'checked' : '';
 
-        let todayHtml = p.current_rank === '-' || p.current_rank === 'loading'
+        // 순위 표시 및 변동 계산
+        let currentRankHtml = p.current_rank === '-' || p.current_rank === 'loading'
             ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
             : formatRank(p.current_rank);
 
+        let rankChange = '';
         if (p.prev_rank && p.prev_rank !== '-' && p.current_rank && p.current_rank !== '-' && p.current_rank !== '200위 밖' && p.current_rank !== '300위 밖' && p.current_rank !== 'loading') {
             const prev = parseInt(p.prev_rank), curr = parseInt(p.current_rank);
             if (!isNaN(prev) && !isNaN(curr)) {
                 const diff = prev - curr;
-                if (diff > 0) todayHtml += ` <span class="rank-up">▲${diff}</span>`;
-                else if (diff < 0) todayHtml += ` <span class="rank-down">▼${Math.abs(diff)}</span>`;
+                if (diff > 0) rankChange = ` <span class="rank-up">▲${diff}</span>`;
+                else if (diff < 0) rankChange = ` <span class="rank-down">▼${Math.abs(diff)}</span>`;
             }
         }
 
-        let firstHtml = p.first_rank === '-' || p.first_rank === 'loading'
+        const firstRank = p.first_rank === '-' || p.first_rank === 'loading'
             ? '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>'
             : formatRank(p.first_rank);
+        
+        const prevRank = formatRank(p.prev_rank);
 
-        tr.innerHTML = `
-            <td class="checkbox-cell"><input type="checkbox" ${isChecked} onchange="toggleSelect(${p.id})"></td>
-            <td id="title-${p.id}" class="truncate" style="max-width:120px" title="${p.title || ''}">${p.title || '-'}</td>
-            <td>${p.keyword}</td>
-            <td>${p.place_id}</td>
-            <td id="first-${p.id}">${firstHtml}</td>
-            <td>${formatRank(p.prev_rank)}</td>
-            <td id="rank-${p.id}">${todayHtml}</td>
-            <td class="action-cell">
+        const card = document.createElement('div');
+        card.className = 'place-card';
+        card.id = 'card-' + p.id;
+        
+        card.innerHTML = `
+            <div class="place-card-header">
+                <input type="checkbox" ${isChecked} onchange="toggleSelect(${p.id})" class="place-card-checkbox">
+                <div style="flex: 1;">
+                    <div class="place-card-title" id="title-${p.id}">${p.title || '-'}</div>
+                    <div class="place-card-keyword">${p.keyword}</div>
+                    <div class="place-card-id">ID: ${p.place_id}</div>
+                </div>
+            </div>
+            
+            <div class="place-card-ranks">
+                <div class="rank-item">
+                    <div class="rank-item-label">최초</div>
+                    <div class="rank-item-value" id="first-${p.id}">${firstRank}</div>
+                </div>
+                <div class="rank-item">
+                    <div class="rank-item-label">이전</div>
+                    <div class="rank-item-value">${prevRank}</div>
+                </div>
+                <div class="rank-item">
+                    <div class="rank-item-label">현재</div>
+                    <div class="rank-item-value" id="rank-${p.id}">${currentRankHtml}${rankChange}</div>
+                </div>
+            </div>
+            
+            <div class="place-card-actions">
                 <button class="btn btn-outline btn-xs" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
                 <button class="btn btn-danger btn-xs" onclick="deletePlace(${p.id})">삭제</button>
-            </td>`;
-        tbody.appendChild(tr);
+            </div>
+        `;
+        
+        container.appendChild(card);
     });
 
     document.getElementById('selectAll').checked = selectedIds.size === places.length && places.length > 0;
@@ -377,7 +430,7 @@ function toggleSelectAll() {
     if (checked) places.forEach(p => selectedIds.add(p.id));
     else selectedIds.clear();
     updateSelectedInfo();
-    renderTable();
+    renderCards();
 }
 
 function updateSelectedInfo() {
@@ -427,19 +480,16 @@ async function checkSingleRank(pid) {
             if (p) {
                 p.current_rank = d.rank;
                 p.first_rank = d.first_rank;
-                p.title = d.title || p.title;
+                if (d.title) p.title = d.title;
             }
 
-            const rankCell = document.getElementById('rank-' + pid);
-            const firstCell = document.getElementById('first-' + pid);
-            const titleCell = document.getElementById('title-' + pid);
+            const rankEl = document.getElementById('rank-' + pid);
+            const firstEl = document.getElementById('first-' + pid);
+            const titleEl = document.getElementById('title-' + pid);
             
-            if (rankCell) rankCell.innerHTML = formatRank(d.rank);
-            if (firstCell) firstCell.innerHTML = formatRank(d.first_rank);
-            if (titleCell) {
-                titleCell.textContent = d.title || '-';
-                titleCell.title = d.title || '';
-            }
+            if (rankEl) rankEl.innerHTML = formatRank(d.rank);
+            if (firstEl) firstEl.innerHTML = formatRank(d.first_rank);
+            if (titleEl && d.title) titleEl.textContent = d.title;
         }
     } catch(e) {
         console.error(e);
