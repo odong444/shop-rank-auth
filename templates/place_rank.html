@@ -205,10 +205,12 @@ input[type="checkbox"] {
 <div class="card">
     <div class="section-title">플레이스 등록</div>
 
+    <div class="input-row" style="flex-wrap: wrap;">
+        <input type="text" id="keyword" placeholder="키워드" class="input" style="flex: 1; min-width: 120px;">
+        <input type="text" id="placeId" placeholder="플레이스 ID" class="input" style="flex: 1; min-width: 120px;">
+    </div>
     <div class="input-row">
-        <input type="text" id="keyword" placeholder="검색 키워드 (예: 강남역 카페)" class="input">
-        <input type="text" id="placeId" placeholder="플레이스 ID" class="input">
-        <input type="text" id="placeName" placeholder="업체명" class="input">
+        <input type="text" id="placeName" placeholder="업체명 (선택)" class="input" style="flex: 1;">
         <button onclick="addPlace()" id="addBtn" class="btn btn-primary btn-sm">등록</button>
     </div>
 
