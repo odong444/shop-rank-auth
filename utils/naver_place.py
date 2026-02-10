@@ -56,6 +56,7 @@ def check_place_rank(keyword, place_id, max_results=300):
         'Referer': 'https://m.map.naver.com/'
     }
     
+    place_data = {}  # place_id: title 매핑
     place_ids = []
     
     # 모바일 지도 검색
@@ -65,8 +66,22 @@ def check_place_rank(keyword, place_id, max_results=300):
         
         if response.status_code == 200:
             response.encoding = 'utf-8'
-            ids = extract_place_ids_from_html(response.text)
-            place_ids.extend(ids)
+            html = response.text
+            
+            # place_id와 업체명 함께 추출
+            # 패턴: data-cid="플레이스ID" ... <span class="title">업체명</span>
+            pattern = r'data-cid="(\d+)"[^>]*>.*?<span[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)</span>'
+            matches = re.findall(pattern, html, re.DOTALL)
+            
+            for pid, title in matches:
+                if pid not in place_data:
+                    place_data[pid] = title.strip()
+                    place_ids.append(pid)
+            
+            # data-cid가 없는 경우 기존 방식
+            if not place_ids:
+                ids = extract_place_ids_from_html(html)
+                place_ids.extend(ids)
     except Exception as e:
         print(f"Mobile search error: {e}")
     
@@ -100,8 +115,13 @@ def check_place_rank(keyword, place_id, max_results=300):
     # 순위 찾기
     for rank, pid in enumerate(place_ids, start=1):
         if pid == place_id:
-            # 업체명 가져오기
-            title = get_place_title(place_id)
+            # 검색 결과에서 가져온 업체명 사용
+            title = place_data.get(pid)
+            
+            # 없으면 별도 조회 (fallback)
+            if not title:
+                title = get_place_title(place_id)
+            
             return (rank, title)
     
     return (None, None)
