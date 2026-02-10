@@ -6,6 +6,13 @@ import requests
 from urllib.parse import quote
 import re
 from datetime import datetime
+import urllib.request
+import urllib.parse
+import json
+
+# 네이버 API 키
+NAVER_CLIENT_ID = "UrlniCJoGZ_jfgk5tlkN"
+NAVER_CLIENT_SECRET = "x3z9b1CM2F"
 
 
 def extract_place_ids_from_html(html):
@@ -86,7 +93,10 @@ def check_place_rank(keyword, place_id, max_results=200):
     place_data = {}  # place_id: title 매핑
     place_ids = []
     
-    # 모바일 지도 검색
+    # 1. 네이버 로컬 API로 업체명 가져오기
+    local_places = get_place_names_from_local_api(keyword, max_results=max_results)
+    
+    # 2. 모바일 지도 검색
     try:
         url = f"https://m.map.naver.com/search2/search.naver?query={quote(keyword)}"
         response = requests.get(url, headers=headers, timeout=10)
@@ -95,8 +105,7 @@ def check_place_rank(keyword, place_id, max_results=200):
             response.encoding = 'utf-8'
             html = response.text
             
-            # place_id와 업체명 함께 추출
-            # 패턴: data-cid="플레이스ID" ... <span class="title">업체명</span>
+            # place_id와 업체명 함께 추출 시도
             pattern = r'data-cid="(\d+)"[^>]*>.*?<span[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)</span>'
             matches = re.findall(pattern, html, re.DOTALL)
             
@@ -105,10 +114,16 @@ def check_place_rank(keyword, place_id, max_results=200):
                     place_data[pid] = title.strip()
                     place_ids.append(pid)
             
-            # data-cid가 없는 경우 기존 방식
+            # data-cid가 없는 경우 기존 방식으로 place_id 추출
             if not place_ids:
                 ids = extract_place_ids_from_html(html)
                 place_ids.extend(ids)
+                
+                # place_id는 있지만 업체명이 없으면 로컬 API 결과로 매칭 시도
+                # 순서가 비슷하다고 가정하고 인덱스로 매칭
+                for idx, pid in enumerate(place_ids):
+                    if pid not in place_data and idx < len(local_places):
+                        place_data[pid] = local_places[idx]['title']
     except Exception as e:
         print(f"Mobile search error: {e}")
     
@@ -167,8 +182,41 @@ def check_place_rank(keyword, place_id, max_results=200):
     return (None, None)
 
 
+def get_place_names_from_local_api(keyword, max_results=50):
+    """
+    네이버 로컬 검색 API로 업체명 리스트 가져오기
+    
+    Returns:
+        list: [{'title': '업체명', 'address': '주소'}, ...]
+    """
+    try:
+        enc = urllib.parse.quote(keyword)
+        url = f"https://openapi.naver.com/v1/search/local.json?query={enc}&display={max_results}&sort=random"
+        
+        req = urllib.request.Request(url)
+        req.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
+        req.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
+        
+        response = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(response.read().decode('utf-8'))
+        
+        results = []
+        for item in data.get('items', []):
+            title = item['title'].replace('<b>', '').replace('</b>', '')
+            results.append({
+                'title': title,
+                'address': item.get('address', ''),
+                'category': item.get('category', '')
+            })
+        
+        return results
+    except Exception as e:
+        print(f"Local API error: {e}")
+        return []
+
+
 def get_place_title(place_id):
-    """플레이스 ID로 업체명 조회"""
+    """플레이스 ID로 업체명 조회 (fallback)"""
     try:
         url = f"https://m.place.naver.com/restaurant/{place_id}"
         headers = {
@@ -179,7 +227,6 @@ def get_place_title(place_id):
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            # UTF-8 인코딩 명시
             response.encoding = 'utf-8'
             
             # <title> 태그에서 업체명 추출
@@ -188,7 +235,8 @@ def get_place_title(place_id):
                 title = match.group(1)
                 # "- 네이버 플레이스" 제거
                 title = title.replace(' - 네이버 플레이스', '').strip()
-                return title
+                if title and title != '네이버 플레이스':
+                    return title
     except Exception as e:
         print(f"Title fetch error: {e}")
     
