@@ -173,9 +173,15 @@ def check_place_rank(keyword, place_id, max_results=200):
             # 검색 결과에서 가져온 업체명 사용
             title = place_data.get(pid)
             
-            # 없으면 별도 조회 (fallback)
+            # 없으면 로컬 API 결과에서 순위로 가져오기
+            if not title and rank <= len(local_places):
+                title = local_places[rank - 1]['title']
+                print(f"Using local API result for rank {rank}: {title}")
+            
+            # 그래도 없으면 fallback (작동 안 할 가능성 높음)
             if not title:
                 title = get_place_title(place_id)
+                print(f"Trying fallback for place_id {place_id}: {title}")
             
             return (rank, title)
     
@@ -191,7 +197,7 @@ def get_place_names_from_local_api(keyword, max_results=50):
     """
     try:
         enc = urllib.parse.quote(keyword)
-        url = f"https://openapi.naver.com/v1/search/local.json?query={enc}&display={max_results}&sort=random"
+        url = f"https://openapi.naver.com/v1/search/local.json?query={enc}&display={max_results}&sort=sim"
         
         req = urllib.request.Request(url)
         req.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
