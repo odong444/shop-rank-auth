@@ -9,10 +9,28 @@ from datetime import datetime
 import urllib.request
 import urllib.parse
 import json
+import random
 
 # 네이버 API 키
 NAVER_CLIENT_ID = "UrlniCJoGZ_jfgk5tlkN"
 NAVER_CLIENT_SECRET = "x3z9b1CM2F"
+
+# Decodo 프록시 설정
+PROXY_HOST = "gate.decodo.com"
+PROXY_USER = "spa2rm7ar7"
+PROXY_PASS = "~oAEv1Dd5wt0goGg4h"
+PROXY_PORT_MIN = 10001
+PROXY_PORT_MAX = 10010
+
+
+def get_proxy():
+    """랜덤 프록시 설정 반환 (포트 로테이션)"""
+    port = random.randint(PROXY_PORT_MIN, PROXY_PORT_MAX)
+    proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{port}"
+    return {
+        'http': proxy_url,
+        'https': proxy_url
+    }
 
 
 def extract_place_ids_from_html(html):
@@ -83,6 +101,9 @@ def check_place_rank(keyword, place_id, max_results=200):
         tuple: (순위, 업체명) - 못 찾으면 (None, None)
     """
     
+    # 프록시 설정
+    proxies = get_proxy()
+    
     headers = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -99,7 +120,7 @@ def check_place_rank(keyword, place_id, max_results=200):
     # 2. 모바일 지도 검색
     try:
         url = f"https://m.map.naver.com/search2/search.naver?query={quote(keyword)}"
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             response.encoding = 'utf-8'
@@ -131,7 +152,7 @@ def check_place_rank(keyword, place_id, max_results=200):
     try:
         url = f"https://map.naver.com/v5/search/{quote(keyword)}"
         headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             response.encoding = 'utf-8'
@@ -224,13 +245,14 @@ def get_place_names_from_local_api(keyword, max_results=50):
 def get_place_title(place_id):
     """플레이스 ID로 업체명 조회 (fallback)"""
     try:
+        proxies = get_proxy()
         url = f"https://m.place.naver.com/restaurant/{place_id}"
         headers = {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'ko-KR,ko;q=0.9'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             response.encoding = 'utf-8'
