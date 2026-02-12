@@ -264,12 +264,18 @@ def get_history(pid):
 @login_required
 def refresh_ranks():
     try:
+        start_time = time.time()
+        
         conn = get_db()
         cur = conn.cursor()
         cur.execute('SELECT id,mid,keyword FROM products WHERE user_id=%s', (session['user_id'],))
         rows = cur.fetchall()
+        total_count = len(rows)
         cur.close()
         conn.close()
+        
+        db_time = time.time() - start_time
+        print(f"[Refresh] DB query: {db_time:.2f}s")
         
         keyword_products = {}
         for r in rows:
@@ -278,19 +284,42 @@ def refresh_ranks():
                 keyword_products[kw] = []
             keyword_products[kw].append({'id': pid, 'mid': mid})
         
+        print(f"[Refresh] Total keywords: {len(keyword_products)}, products: {total_count}")
+        
         updated = 0
-        for kw, prods in keyword_products.items():
+        for idx, (kw, prods) in enumerate(keyword_products.items(), 1):
+            kw_start = time.time()
+            
             results = get_cached_results(kw)
+            cache_hit = results is not None
+            
             if not results:
+                api_start = time.time()
                 results = get_naver_search_results(kw)
+                api_time = time.time() - api_start
+                print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': API call {api_time:.2f}s")
+                
                 if results:
                     save_cache(kw, results)
-                time.sleep(0.2)
+                time.sleep(0.05)  # 0.2초 → 0.05초로 단축
+            else:
+                print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': Cache hit")
             
-            updated += update_all_products_with_keyword(kw, results)
+            update_start = time.time()
+            updated += update_all_products_with_keyword(kw, results, user_id=session['user_id'])
+            update_time = time.time() - update_start
+            
+            kw_total = time.time() - kw_start
+            print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': update {update_time:.2f}s, total {kw_total:.2f}s (cache: {cache_hit})")
         
-        return jsonify({'success': True, 'updated': updated})
+        total_time = time.time() - start_time
+        print(f"[Refresh] DONE: {updated} products in {total_time:.2f}s")
+        
+        return jsonify({'success': True, 'updated': updated, 'total': total_count, 'time': f'{total_time:.2f}s'})
     except Exception as e:
+        import traceback
+        print(f"[Refresh Error] {e}")
+        print(traceback.format_exc())
         return jsonify({'success': False, 'message': str(e)})
 
 @dashboard_bp.route('/api/export')
