@@ -381,16 +381,53 @@ def analyze_keyword():
         except Exception as e:
             print(f"[Analyze] Step 2 error: {e}")
 
-        # 3. 쇼핑 상위 상품
-        print(f"[Analyze] Step 3: Top products")
+        # 3. 상품지수 조회 (로컬 서버 직접 호출)
+        print(f"[Analyze] Step 3: Product scores via local API")
         try:
-            result['top_products'] = get_shopping_top_products(keyword, 10)
-            print(f"[Analyze] Step 3 done: {len(result['top_products'])} products")
+            # 로컬 서버 /api/product-score 호출 (키워드 한번에 100개 상품+지수)
+            response = requests.get(
+                f"{RANK_API_URL}/api/product-score",
+                params={"keyword": keyword},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                products = data.get('result', {}).get('products', [])
+                
+                # 상위 5개만 선택
+                top_5 = []
+                for i, p in enumerate(products[:5], 1):
+                    top_5.append({
+                        'rank': i,
+                        'nvmid': str(p.get('nvmid', '')),
+                        'mallSeq': p.get('mallSeq', ''),
+                        'productTitle': p.get('productTitle', ''),
+                        'imageUrl': p.get('imageUrl', ''),
+                        'mallName': p.get('mallName', ''),
+                        'lowPrice': p.get('lowPrice', 0),
+                        'reviewCount': p.get('reviewCount', 0),
+                        'keepCnt': p.get('keepCnt', 0),
+                        'purchaseCnt': p.get('purchaseCnt', 0),
+                        'category': p.get('category', ''),
+                        # 상품지수
+                        'relevanceStarScore': p.get('relevanceStarScore', 0),
+                        'hitStarScore': p.get('hitStarScore', 0),
+                        'saleStarScore': p.get('saleStarScore', 0),
+                        'reviewCountStarScore': p.get('reviewCountStarScore', 0),
+                    })
+                
+                result['top_products'] = top_5
+                print(f"[Analyze] Step 3 done: {len(top_5)} products with scores")
+            else:
+                print(f"[Analyze] Step 3 failed: {response.status_code}")
+                result['top_products'] = []
+                
         except Exception as e:
             print(f"[Analyze] Step 3 error: {e}")
+            result['top_products'] = []
 
-        # 4. 매출 조회는 별도 API로 분리 (헤드리스 브라우저 리졸브 시간 소요)
-        # 프론트엔드에서 /api/keyword-report/sales 별도 호출
+        # 4. 매출 조회 가능 여부
         result['sales_available'] = len(result['top_products']) > 0
 
         # AI 분석은 별도 API로 분리 (타임아웃 방지)
@@ -409,10 +446,8 @@ def analyze_keyword():
 @login_required
 def fetch_sales():
     """
-    상위 스토어 월간 매출 조회 (별도 비동기 호출)
-    헤드리스 브라우저 리졸브 시간이 걸리므로 메인 분석과 분리
+    상위 스토어 월간 매출 조회 (mallSeq 기반 - 빠른 조회)
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     try:
         data = request.get_json()
         products = data.get('products', [])
@@ -420,84 +455,77 @@ def fetch_sales():
         if not products:
             return jsonify({"success": False, "error": "상품 데이터가 필요합니다."}), 400
 
-        # 스마트스토어 상품만 필터 + 중복 mall 제거
-        seen_malls = set()
-        smartstore_products = []
-        for p in products[:10]:
-            mall = p.get('mall', '')
-            link = p.get('link', '')
-            if 'smartstore.naver.com/main/' in link and mall not in seen_malls:
-                seen_malls.add(mall)
-                smartstore_products.append(p)
-        print(f"[Sales] {len(smartstore_products)} smartstore products to resolve")
-
         monthly_sales = []
-        seen_stores = set()
 
-        def _extract_sales(sales_data, url_product_id, mall):
-            """brand-sales 응답에서 상품 매출 추출 (product_id 매칭 + 합산)"""
-            if not sales_data:
-                return None
-            products_data = sales_data.get('products', [])
+        for product in products:
+            mall_seq = product.get('mallSeq')
+            nvmid = product.get('nvmid', '')
+            mall_name = product.get('mallName', '-')
+            product_title = product.get('productTitle', '')
 
-            if url_product_id and products_data:
-                matched = [p for p in products_data if str(p.get('product_id', '')) == url_product_id]
-                if matched:
-                    return {
-                        'amount': sum(p.get('amount', 0) for p in matched),
-                        'count': sum(p.get('count', 0) for p in matched),
-                        'clicks': sum(p.get('clicks', 0) for p in matched),
-                        'match_type': 'product'
-                    }
-
-            # fallback: 스토어 전체
-            summary = sales_data.get('summary', {})
-            if summary.get('total_amount', 0) > 0:
-                return {
-                    'amount': summary['total_amount'],
-                    'count': summary.get('total_count', 0),
-                    'clicks': summary.get('total_clicks', 0),
-                    'match_type': 'store_total'
-                }
-            return None
-
-        def resolve_and_fetch(product):
-            """URL 리졸브 + 월간/일간 매출 조회"""
-            import re
-            link = product.get('link', '')
-            mall = product.get('mall', '-')
-            product_title = product.get('title', '')
-
-            pid_match = re.search(r'/products/(\d+)', link)
-            url_product_id = pid_match.group(1) if pid_match else ''
+            if not mall_seq:
+                print(f"[Sales] {mall_name}: mallSeq 없음, 스킵")
+                continue
 
             try:
-                store_url = extract_store_url(link)
-                print(f"[Sales] {mall}: store_url={store_url}, url_pid={url_product_id}")
-                if not store_url:
-                    return None
+                print(f"[Sales] {mall_name}: mallSeq={mall_seq}, nvmid={nvmid}")
+                
+                # mallSeq로 월간 매출 조회
+                monthly_data = get_brand_sales(mall_seq, 'monthly')
+                
+                if not monthly_data:
+                    print(f"[Sales] {mall_name}: 매출 데이터 없음")
+                    continue
 
-                # 월간 매출
-                monthly_data = get_brand_sales_by_url(store_url, 'monthly')
-                monthly = _extract_sales(monthly_data, url_product_id, mall)
+                products_data = monthly_data.get('products', [])
+                
+                # nvmid로 특정 상품 찾기
+                matched_product = None
+                if nvmid and products_data:
+                    for p in products_data:
+                        if str(p.get('product_id', '')) == nvmid:
+                            matched_product = p
+                            break
 
-                # 일간 매출
-                daily_data = get_brand_sales_by_url(store_url, 'daily')
-                daily = _extract_sales(daily_data, url_product_id, mall)
-
-                if monthly or daily:
-                    result = {
-                        'mall': mall,
+                if matched_product:
+                    # 특정 상품 매출
+                    monthly_sales.append({
+                        'mall': mall_name,
                         'title': product_title,
-                        'store_url': store_url,
-                        'match_type': (monthly or daily).get('match_type', 'product'),
-                    }
-                    if monthly:
-                        result['monthly_amount'] = monthly['amount']
-                        result['monthly_count'] = monthly['count']
-                    if daily:
-                        result['daily_amount'] = daily['amount']
-                        result['daily_count'] = daily['count']
+                        'match_type': 'product',
+                        'monthly_amount': matched_product.get('amount', 0),
+                        'monthly_count': matched_product.get('count', 0),
+                    })
+                    print(f"[Sales] {mall_name}: 상품 매출 {matched_product.get('amount', 0):,}원")
+                else:
+                    # 상품 매칭 실패 → 스토어 전체 매출로 fallback
+                    summary = monthly_data.get('summary', {})
+                    if summary.get('total_amount', 0) > 0:
+                        monthly_sales.append({
+                            'mall': mall_name,
+                            'title': product_title,
+                            'match_type': 'store_total',
+                            'monthly_amount': summary['total_amount'],
+                            'monthly_count': summary.get('total_count', 0),
+                        })
+                        print(f"[Sales] {mall_name}: 스토어 전체 매출 {summary['total_amount']:,}원 (상품 매칭 실패)")
+
+            except Exception as e:
+                print(f"[Sales] {mall_name} 오류: {e}")
+                continue
+
+        print(f"[Sales] 총 {len(monthly_sales)}개 스토어 매출 조회 완료")
+
+        return jsonify({
+            "success": True,
+            "sales": monthly_sales
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[Sales Error] {e}")
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
                     print(f"[Sales] {mall} OK: monthly={monthly['amount'] if monthly else 0}, daily={daily['amount'] if daily else 0}")
                     return result
                 else:

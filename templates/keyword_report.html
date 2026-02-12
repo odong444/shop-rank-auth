@@ -130,6 +130,19 @@
         </div>
     </div>
 
+    <!-- 상위 5개 상품 + 상품지수 -->
+    <div class="card">
+        <div class="card-header"><h3>🏆 상위 5개 상품 + 상품지수</h3></div>
+        <div class="card-body">
+            <table class="keyword-table">
+                <thead><tr><th>#</th><th>상품명</th><th>스토어</th><th>가격</th><th>리뷰</th><th>구매</th><th>찜</th><th>종합</th><th>인기</th><th>판매</th><th>리뷰점수</th></tr></thead>
+                <tbody id="topProducts">
+                    <tr><td colspan="11" style="text-align:center;padding:20px;color:#888">상품 데이터 없음</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- 상위 월간 매출 -->
     <div class="card">
         <div class="card-header"><h3>💰 상위 상품 월간 매출</h3></div>
@@ -137,19 +150,6 @@
             <table class="keyword-table">
                 <thead><tr><th>#</th><th>스토어</th><th>월간 매출</th><th>판매건수</th></tr></thead>
                 <tbody id="topMonthlySales">
-                    <tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- 상위 일간 매출 -->
-    <div class="card">
-        <div class="card-header"><h3>📅 상위 상품 일간 매출</h3></div>
-        <div class="card-body">
-            <table class="keyword-table">
-                <thead><tr><th>#</th><th>스토어</th><th>일간 매출</th><th>판매건수</th></tr></thead>
-                <tbody id="topDailySales">
                     <tr><td colspan="4" style="text-align:center;padding:20px;color:#888">매출 데이터 없음</td></tr>
                 </tbody>
             </table>
@@ -452,6 +452,29 @@ function renderResults(data) {
             <td>${kw.competition}</td>
         </tr>`;
     });
+
+    // 상위 5개 상품 + 상품지수
+    const productsTbody = document.getElementById('topProducts');
+    productsTbody.innerHTML = '';
+    if (data.top_products && data.top_products.length > 0) {
+        data.top_products.forEach((p, i) => {
+            productsTbody.innerHTML += `<tr>
+                <td>${i+1}</td>
+                <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.productTitle || ''}">${p.productTitle || '-'}</div></td>
+                <td>${p.mallName || '-'}</td>
+                <td>${formatNumber(p.lowPrice)}원</td>
+                <td>${formatNumber(p.reviewCount)}</td>
+                <td>${formatNumber(p.purchaseCnt)}</td>
+                <td>${formatNumber(p.keepCnt)}</td>
+                <td><strong style="color:#667eea">${p.relevanceStarScore || 0}</strong></td>
+                <td>${p.hitStarScore || 0}</td>
+                <td>${p.saleStarScore || 0}</td>
+                <td>${p.reviewCountStarScore || 0}</td>
+            </tr>`;
+        });
+    } else {
+        productsTbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#888">상품 데이터 없음</td></tr>';
+    }
 
     // 매출은 별도 비동기 호출 (runSalesAnalysis)에서 렌더링
 
