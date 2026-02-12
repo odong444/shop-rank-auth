@@ -220,11 +220,13 @@ def refresh_ranks():
             WHERE user_id=%s
         ''', (session['user_id'],))
         rows = cur.fetchall()
+        total_count = len(rows)
         cur.close()
         conn.close()
         
         from utils.naver_place import check_place_rank
         updated = 0
+        failed = 0
         
         for pid, place_id, keyword in rows:
             try:
@@ -235,8 +237,17 @@ def refresh_ranks():
                 cur = conn.cursor()
                 
                 # 현재 순위 및 기존 업체명 가져오기
-                cur.execute('SELECT first_rank, current_rank, title FROM place_ranks WHERE id=%s', (pid,))
-                first_rank, prev_rank, existing_title = cur.fetchone()
+                cur.execute('SELECT first_rank, current_rank, title FROM place_ranks WHERE id=%s AND user_id=%s', (pid, session['user_id']))
+                row = cur.fetchone()
+                
+                if not row:
+                    # 다른 사용자의 데이터거나 삭제된 경우 스킵
+                    cur.close()
+                    conn.close()
+                    failed += 1
+                    continue
+                
+                first_rank, prev_rank, existing_title = row
                 
                 # 최초 순위 설정
                 if first_rank == '-':
@@ -249,8 +260,8 @@ def refresh_ranks():
                 cur.execute('''
                     UPDATE place_ranks
                     SET title=%s, first_rank=%s, prev_rank=%s, current_rank=%s, last_checked=NOW()
-                    WHERE id=%s
-                ''', (final_title, first_rank, prev_rank, rank_str, pid))
+                    WHERE id=%s AND user_id=%s
+                ''', (final_title, first_rank, prev_rank, rank_str, pid, session['user_id']))
                 
                 # 이력 저장
                 cur.execute('''
@@ -265,9 +276,10 @@ def refresh_ranks():
                 updated += 1
             except Exception as e:
                 print(f"Error checking place {pid}: {e}")
+                failed += 1
                 continue
         
-        return jsonify({'success': True, 'updated': updated})
+        return jsonify({'success': True, 'updated': updated, 'failed': failed, 'total': total_count})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 

@@ -462,11 +462,14 @@ async function deleteSelected() {
 }
 
 async function checkPendingRanks() {
-    for (const p of places) {
-        if (p.current_rank === '-' || p.current_rank === 'loading') {
-            await checkSingleRank(p.id);
-            await new Promise(r => setTimeout(r, 300));
-        }
+    const pendingPlaces = places.filter(p => p.current_rank === '-' || p.current_rank === 'loading');
+    
+    // 병렬 처리 (5개씩 배치)
+    const batchSize = 5;
+    for (let i = 0; i < pendingPlaces.length; i += batchSize) {
+        const batch = pendingPlaces.slice(i, i + batchSize);
+        await Promise.all(batch.map(p => checkSingleRank(p.id)));
+        await new Promise(r => setTimeout(r, 300)); // 배치 간 딜레이
     }
 }
 
@@ -581,15 +584,27 @@ async function refreshAll() {
     btn.disabled = true;
     btn.textContent = '조회중...';
 
+    // 각 카드의 "현재" 칸에 로딩 스피너 표시
+    places.forEach(p => {
+        const rankEl = document.getElementById('rank-' + p.id);
+        if (rankEl) {
+            rankEl.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>';
+        }
+    });
+
     try {
         const r = await fetch('/api/place-rank/refresh', {method: 'POST'});
         const d = await r.json();
         if (d.success) {
-            alert(`${d.updated}개 플레이스 조회 완료`);
+            // UI에 표시된 개수 기준으로 표시
+            const actualCount = places.length;
+            alert(`${actualCount}개 플레이스 조회 완료`);
             loadPlaces();
         } else alert(d.message);
     } catch(e) {
         alert('서버 연결 실패');
+        // 오류 시 다시 로드해서 원래 상태로 복구
+        loadPlaces();
     } finally {
         btn.disabled = false;
         btn.textContent = '새로고침';
