@@ -526,41 +526,6 @@ def fetch_sales():
         print(f"[Sales Error] {e}")
         print(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
-                    print(f"[Sales] {mall} OK: monthly={monthly['amount'] if monthly else 0}, daily={daily['amount'] if daily else 0}")
-                    return result
-                else:
-                    print(f"[Sales] {mall}: no data")
-                    return None
-            except Exception as e:
-                print(f"[Sales] Error for {mall}: {e}")
-            return None
-
-        # 병렬 리졸브 (최대 5개 동시, Cloudflare 100초 제한 대비)
-        sales_results = []
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(resolve_and_fetch, p): p for p in smartstore_products[:5]}
-            try:
-                for future in as_completed(futures, timeout=85):
-                    try:
-                        sale = future.result()
-                        if sale and sale['store_url'] not in seen_stores:
-                            seen_stores.add(sale['store_url'])
-                            sales_results.append(sale)
-                            if len(sales_results) >= 5:
-                                break
-                    except Exception as e:
-                        print(f"[Sales] Future error: {e}")
-            except Exception as e:
-                print(f"[Sales] Timeout waiting for futures: {e}")
-
-        print(f"[Sales] Done: {len(sales_results)} results")
-        return jsonify({"success": True, "sales": sales_results})
-
-    except Exception as e:
-        import traceback
-        print(f"[Sales Error] {e}")
-        print(traceback.format_exc())
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @keyword_report_bp.route('/api/keyword-report/quick', methods=['POST'])
