@@ -228,6 +228,8 @@ def fetch_sales():
                         if seller_data.get('success'):
                             mall_seq = seller_data['mall_seq']
                             mall_name = seller_data.get('mall_name', mall_name)
+                            # ★ 개별 상품 ID로 매출 필터링
+                            nvmid = seller_data.get('mall_product_id', '')
                 except Exception as e:
                     print(f"[Catalog Seller Error] {product_title}: {e}")
             
@@ -235,7 +237,7 @@ def fetch_sales():
                 continue
             
             try:
-                url = f"{RANK_API_URL}/api/brand-sales?mall_seq={mall_seq}&period={period}"
+                url = f"{RANK_API_URL}/api/brand-sales?mall_seq={mall_seq}&period={period}&product_id={nvmid}"
                 response = requests.get(url, timeout=30)
                 
                 if response.status_code == 200:
