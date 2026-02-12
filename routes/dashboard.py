@@ -264,6 +264,8 @@ def get_history(pid):
 @login_required
 def refresh_ranks():
     try:
+        import concurrent.futures
+        
         start_time = time.time()
         
         conn = get_db()
@@ -286,8 +288,8 @@ def refresh_ranks():
         
         print(f"[Refresh] Total keywords: {len(keyword_products)}, products: {total_count}")
         
-        updated = 0
-        for idx, (kw, prods) in enumerate(keyword_products.items(), 1):
+        # 병렬 처리 함수
+        def process_keyword(kw):
             kw_start = time.time()
             
             results = get_cached_results(kw)
@@ -297,20 +299,45 @@ def refresh_ranks():
                 api_start = time.time()
                 results = get_naver_search_results(kw)
                 api_time = time.time() - api_start
-                print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': API call {api_time:.2f}s")
+                print(f"[Refresh] '{kw}': API call {api_time:.2f}s")
                 
                 if results:
                     save_cache(kw, results)
-                time.sleep(0.05)  # 0.2초 → 0.05초로 단축
             else:
-                print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': Cache hit")
+                print(f"[Refresh] '{kw}': Cache hit")
             
             update_start = time.time()
-            updated += update_all_products_with_keyword(kw, results, user_id=session['user_id'])
+            count = update_all_products_with_keyword(kw, results, user_id=session['user_id'])
             update_time = time.time() - update_start
             
             kw_total = time.time() - kw_start
-            print(f"[Refresh] {idx}/{len(keyword_products)} '{kw}': update {update_time:.2f}s, total {kw_total:.2f}s (cache: {cache_hit})")
+            print(f"[Refresh] '{kw}': update {update_time:.2f}s, total {kw_total:.2f}s (cache: {cache_hit})")
+            
+            return count
+        
+        # 키워드 리스트
+        keywords = list(keyword_products.keys())
+        updated = 0
+        
+        # 병렬 처리 (5개씩 배치)
+        batch_size = 5
+        with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
+            for i in range(0, len(keywords), batch_size):
+                batch = keywords[i:i + batch_size]
+                print(f"[Refresh] Processing batch {i//batch_size + 1}/{(len(keywords) + batch_size - 1)//batch_size}: {batch}")
+                
+                futures = {executor.submit(process_keyword, kw): kw for kw in batch}
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        count = future.result()
+                        updated += count
+                    except Exception as e:
+                        kw = futures[future]
+                        print(f"[Refresh Error] Keyword '{kw}': {e}")
+                
+                # 배치 간 딜레이 (마지막 배치 제외)
+                if i + batch_size < len(keywords):
+                    time.sleep(0.3)
         
         total_time = time.time() - start_time
         print(f"[Refresh] DONE: {updated} products in {total_time:.2f}s")
