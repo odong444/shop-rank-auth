@@ -3,8 +3,15 @@
 
 {% block extra_css %}
 <style>
-.search-box { display: flex; gap: 8px; margin-bottom: 16px; }
-.search-box .input { flex: 1; }
+.search-box { 
+    display: flex; 
+    gap: 8px; 
+    margin-bottom: 16px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.search-box .input { flex: 1; text-align: center; }
 .report-card {
     background: #fff;
     border: 1px solid var(--border);
@@ -145,9 +152,10 @@
     <button onclick="analyzeKeyword()" id="searchBtn" class="btn btn-primary">분석</button>
 </div>
 
-<div id="loading" class="loading-box hidden">
-    <div class="spinner"></div>
-    <p class="mt-4 text-sm">분석 중...</p>
+<div id="loading" class="hidden" style="text-align: center; padding: 80px 16px;">
+    <div class="spinner" style="width: 60px; height: 60px; border-width: 6px; margin: 0 auto;"></div>
+    <p style="margin-top: 24px; font-size: 1.125rem; font-weight: 600; color: var(--text-dark);">분석 중입니다...</p>
+    <p style="margin-top: 8px; font-size: 0.875rem; color: var(--text-gray);">잠시만 기다려주세요</p>
 </div>
 
 <div id="error" class="error-box hidden">
@@ -200,13 +208,16 @@
         <table class="simple-table">
             <thead>
                 <tr>
-                    <th style="width: 50%;">키워드</th>
-                    <th style="width: 30%; text-align: right;">검색량</th>
-                    <th style="width: 20%; text-align: center;">경쟁도</th>
+                    <th style="width: 30%;">키워드</th>
+                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">검색량</th>
+                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">블로그</th>
+                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">카페</th>
+                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">쇼핑</th>
+                    <th style="width: 14%; text-align: center; font-size: 0.688rem;">경쟁도</th>
                 </tr>
             </thead>
             <tbody id="relatedTable">
-                <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>
+                <tr><td colspan="6" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>
             </tbody>
         </table>
     </div>
@@ -218,7 +229,7 @@
         </div>
     </div>
 
-    <div class="report-card" id="salesCard" style="display: none;">
+    <div class="report-card" id="monthlySalesCard" style="display: none;">
         <div class="card-title">💰 월간 매출</div>
         <table class="simple-table">
             <thead>
@@ -228,7 +239,23 @@
                     <th style="width: 30%; text-align: right;">판매건수</th>
                 </tr>
             </thead>
-            <tbody id="salesTable">
+            <tbody id="monthlySalesTable">
+                <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">로딩 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="report-card" id="dailySalesCard" style="display: none;">
+        <div class="card-title">📅 일간 매출</div>
+        <table class="simple-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">스토어</th>
+                    <th style="width: 30%; text-align: right;">매출액</th>
+                    <th style="width: 30%; text-align: right;">판매건수</th>
+                </tr>
+            </thead>
+            <tbody id="dailySalesTable">
                 <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">로딩 중...</td></tr>
             </tbody>
         </table>
@@ -315,11 +342,14 @@ function displayResult(data) {
             <tr>
                 <td>${kw.keyword}</td>
                 <td style="text-align: right;">${formatNumber(kw.volume)}</td>
+                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.blog || 0)}</td>
+                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.cafe || 0)}</td>
+                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.shop || 0)}</td>
                 <td style="text-align: center;">${kw.competition}</td>
             </tr>
         `).join('');
     } else {
-        relatedTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>';
+        relatedTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>';
     }
     
     const productsArea = document.getElementById('productsArea');
@@ -347,23 +377,28 @@ function displayResult(data) {
 }
 
 async function fetchSalesData(products) {
-    const salesCard = document.getElementById('salesCard');
-    const salesTable = document.getElementById('salesTable');
+    const monthlySalesCard = document.getElementById('monthlySalesCard');
+    const monthlySalesTable = document.getElementById('monthlySalesTable');
+    const dailySalesCard = document.getElementById('dailySalesCard');
+    const dailySalesTable = document.getElementById('dailySalesTable');
     
-    salesCard.style.display = 'block';
-    salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">조회 중...</td></tr>';
+    monthlySalesCard.style.display = 'block';
+    dailySalesCard.style.display = 'block';
+    monthlySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">조회 중...</td></tr>';
+    dailySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">조회 중...</td></tr>';
     
     try {
-        const response = await fetch('/api/keyword-report/sales', {
+        // 월간 매출
+        const monthlyResponse = await fetch('/api/keyword-report/sales', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({products: products})
+            body: JSON.stringify({products: products, period: 'monthly'})
         });
         
-        const result = await response.json();
+        const monthlyResult = await monthlyResponse.json();
         
-        if (result.success && result.sales && result.sales.length > 0) {
-            salesTable.innerHTML = result.sales.map(s => `
+        if (monthlyResult.success && monthlyResult.sales && monthlyResult.sales.length > 0) {
+            monthlySalesTable.innerHTML = monthlyResult.sales.map(s => `
                 <tr>
                     <td>${s.mall}</td>
                     <td style="text-align: right;">${formatNumber(s.amount)}원</td>
@@ -371,11 +406,33 @@ async function fetchSalesData(products) {
                 </tr>
             `).join('');
         } else {
-            salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">매출 데이터 없음</td></tr>';
+            monthlySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">매출 데이터 없음</td></tr>';
+        }
+        
+        // 일간 매출
+        const dailyResponse = await fetch('/api/keyword-report/sales', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({products: products, period: 'daily'})
+        });
+        
+        const dailyResult = await dailyResponse.json();
+        
+        if (dailyResult.success && dailyResult.sales && dailyResult.sales.length > 0) {
+            dailySalesTable.innerHTML = dailyResult.sales.map(s => `
+                <tr>
+                    <td>${s.mall}</td>
+                    <td style="text-align: right;">${formatNumber(s.amount)}원</td>
+                    <td style="text-align: right;">${formatNumber(s.count)}건</td>
+                </tr>
+            `).join('');
+        } else {
+            dailySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">매출 데이터 없음</td></tr>';
         }
     } catch (err) {
         console.error(err);
-        salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #EF4444;">조회 실패</td></tr>';
+        monthlySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #EF4444;">조회 실패</td></tr>';
+        dailySalesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #EF4444;">조회 실패</td></tr>';
     }
 }
 

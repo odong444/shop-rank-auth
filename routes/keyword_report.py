@@ -127,14 +127,42 @@ def analyze_keyword():
                     mobile = parse_count(kw.get('monthlyMobileQcCnt', 0))
                     volume = pc + mobile
                     
+                    # 블로그/카페/쇼핑 수 조회
+                    blog_count = 0
+                    cafe_count = 0
+                    shop_count = 0
+                    
+                    try:
+                        for search_type, api_type in [('blog', 'blog'), ('cafe', 'cafearticle'), ('shop', 'shop')]:
+                            url = f"https://openapi.naver.com/v1/search/{api_type}.json"
+                            headers = {
+                                "X-Naver-Client-Id": NAVER_CLIENT_ID,
+                                "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+                            }
+                            resp = requests.get(url, headers=headers, params={"query": rel_keyword, "display": 1}, timeout=5)
+                            if resp.status_code == 200:
+                                count = resp.json().get('total', 0)
+                                if search_type == 'blog':
+                                    blog_count = count
+                                elif search_type == 'cafe':
+                                    cafe_count = count
+                                elif search_type == 'shop':
+                                    shop_count = count
+                            time.sleep(0.1)  # API 호출 간격
+                    except:
+                        pass
+                    
                     related.append({
                         'keyword': rel_keyword,
                         'volume': volume,
-                        'competition': kw.get('compIdx', '-')
+                        'competition': kw.get('compIdx', '-'),
+                        'blog': blog_count,
+                        'cafe': cafe_count,
+                        'shop': shop_count
                     })
                 
                 related.sort(key=lambda x: x['volume'], reverse=True)
-                result['related_keywords'] = related[:10]
+                result['related_keywords'] = related[:5]
         except Exception as e:
             print(f"[Keyword API Error] {e}")
         
@@ -199,6 +227,7 @@ def fetch_sales():
     try:
         data = request.get_json()
         products = data.get('products', [])
+        period = data.get('period', 'monthly')  # monthly 또는 daily
         
         if not products:
             return jsonify({"success": False, "error": "상품 데이터가 필요합니다"}), 400
@@ -215,12 +244,12 @@ def fetch_sales():
                 continue
             
             try:
-                url = f"{RANK_API_URL}/api/brand-sales?mall_seq={mall_seq}&period=monthly"
+                url = f"{RANK_API_URL}/api/brand-sales?mall_seq={mall_seq}&period={period}"
                 response = requests.get(url, timeout=30)
                 
                 if response.status_code == 200:
-                    monthly_data = response.json()
-                    products_data = monthly_data.get('products', [])
+                    sales_data = response.json()
+                    products_data = sales_data.get('products', [])
                     
                     matched = None
                     if nvmid and products_data:
@@ -238,7 +267,7 @@ def fetch_sales():
                             'match_type': 'product'
                         })
                     else:
-                        summary = monthly_data.get('summary', {})
+                        summary = sales_data.get('summary', {})
                         if summary.get('total_amount', 0) > 0:
                             sales_result.append({
                                 'mall': mall_name,
