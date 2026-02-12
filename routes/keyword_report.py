@@ -127,38 +127,13 @@ def analyze_keyword():
                     mobile = parse_count(kw.get('monthlyMobileQcCnt', 0))
                     volume = pc + mobile
                     
-                    # 블로그/카페/쇼핑 수 조회
-                    blog_count = 0
-                    cafe_count = 0
-                    shop_count = 0
-                    
-                    try:
-                        for search_type, api_type in [('blog', 'blog'), ('cafe', 'cafearticle'), ('shop', 'shop')]:
-                            url = f"https://openapi.naver.com/v1/search/{api_type}.json"
-                            headers = {
-                                "X-Naver-Client-Id": NAVER_CLIENT_ID,
-                                "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
-                            }
-                            resp = requests.get(url, headers=headers, params={"query": rel_keyword, "display": 1}, timeout=5)
-                            if resp.status_code == 200:
-                                count = resp.json().get('total', 0)
-                                if search_type == 'blog':
-                                    blog_count = count
-                                elif search_type == 'cafe':
-                                    cafe_count = count
-                                elif search_type == 'shop':
-                                    shop_count = count
-                            time.sleep(0.1)  # API 호출 간격
-                    except:
-                        pass
-                    
                     related.append({
                         'keyword': rel_keyword,
                         'volume': volume,
                         'competition': kw.get('compIdx', '-'),
-                        'blog': blog_count,
-                        'cafe': cafe_count,
-                        'shop': shop_count
+                        'blog': 0,
+                        'cafe': 0,
+                        'shop': 0
                     })
                 
                 related.sort(key=lambda x: x['volume'], reverse=True)

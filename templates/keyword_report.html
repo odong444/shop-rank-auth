@@ -208,16 +208,13 @@
         <table class="simple-table">
             <thead>
                 <tr>
-                    <th style="width: 30%;">키워드</th>
-                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">검색량</th>
-                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">블로그</th>
-                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">카페</th>
-                    <th style="width: 14%; text-align: right; font-size: 0.688rem;">쇼핑</th>
-                    <th style="width: 14%; text-align: center; font-size: 0.688rem;">경쟁도</th>
+                    <th style="width: 50%;">키워드</th>
+                    <th style="width: 30%; text-align: right;">검색량</th>
+                    <th style="width: 20%; text-align: center;">경쟁도</th>
                 </tr>
             </thead>
             <tbody id="relatedTable">
-                <tr><td colspan="6" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>
+                <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>
             </tbody>
         </table>
     </div>
@@ -342,14 +339,11 @@ function displayResult(data) {
             <tr>
                 <td>${kw.keyword}</td>
                 <td style="text-align: right;">${formatNumber(kw.volume)}</td>
-                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.blog || 0)}</td>
-                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.cafe || 0)}</td>
-                <td style="text-align: right; font-size: 0.75rem;">${formatNumber(kw.shop || 0)}</td>
                 <td style="text-align: center;">${kw.competition}</td>
             </tr>
         `).join('');
     } else {
-        relatedTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>';
+        relatedTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>';
     }
     
     const productsArea = document.getElementById('productsArea');
