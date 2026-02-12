@@ -363,7 +363,7 @@
 </head>
 <body>
 
-{% set is_naver = active_menu in ['naver-shop', 'brand-sales', 'place-rank'] %}
+{% set is_naver = active_menu in ['naver-shop', 'brand-sales', 'place-rank', 'product-score'] %}
 {% set is_coupang = active_menu in ['coupang-rank', 'coupang-sales'] %}
 
 <div class="app-container">
@@ -383,6 +383,7 @@
     <nav class="sub-nav">
         {% if is_naver %}
         <a href="/naver-shop" class="sub-tab {% if active_menu == 'naver-shop' %}active{% endif %}">쇼핑순위</a>
+        <a href="/product-score" class="sub-tab {% if active_menu == 'product-score' %}active{% endif %}">상품지수</a>
         <a href="/brand-sales" class="sub-tab {% if active_menu == 'brand-sales' %}active{% endif %}">스토어매출</a>
         <a href="/place-rank" class="sub-tab {% if active_menu == 'place-rank' %}active{% endif %}">플레이스 순위</a>
         {% elif is_coupang %}
@@ -390,6 +391,7 @@
         <a href="/coupang-sales" class="sub-tab {% if active_menu == 'coupang-sales' %}active{% endif %}">매출조회</a>
         {% else %}
         <a href="/naver-shop" class="sub-tab">쇼핑순위</a>
+        <a href="/product-score" class="sub-tab">상품지수</a>
         <a href="/brand-sales" class="sub-tab">스토어매출</a>
         <a href="/place-rank" class="sub-tab">플레이스 순위</a>
         {% endif %}
