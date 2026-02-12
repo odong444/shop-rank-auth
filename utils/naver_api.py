@@ -77,7 +77,7 @@ def save_cache(keyword, results):
         cur.close()
         conn.close()
 
-def update_all_products_with_keyword(keyword, results):
+def update_all_products_with_keyword(keyword, results, user_id=None):
     """해당 키워드를 가진 모든 사용자의 상품 순위 업데이트"""
     if not results:
         return 0
@@ -87,7 +87,10 @@ def update_all_products_with_keyword(keyword, results):
     conn = get_db()
     cur = conn.cursor()
     
-    cur.execute('SELECT id, mid, first_rank FROM products WHERE keyword=%s', (keyword,))
+    if user_id:
+        cur.execute('SELECT id, mid, first_rank FROM products WHERE keyword=%s AND user_id=%s', (keyword, user_id))
+    else:
+        cur.execute('SELECT id, mid, first_rank FROM products WHERE keyword=%s', (keyword,))
     products = cur.fetchall()
     
     updated = 0
