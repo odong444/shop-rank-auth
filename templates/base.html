@@ -363,7 +363,7 @@
 </head>
 <body>
 
-{% set is_naver = active_menu in ['naver-shop', 'brand-sales', 'place-rank', 'product-score'] %}
+{% set is_naver = active_menu in ['naver-shop', 'brand-sales', 'place-rank', 'product-score', 'keyword-report'] %}
 {% set is_coupang = active_menu in ['coupang-rank', 'coupang-sales'] %}
 
 <div class="app-container">
@@ -386,6 +386,7 @@
         <a href="/product-score" class="sub-tab {% if active_menu == 'product-score' %}active{% endif %}">상품지수</a>
         <a href="/brand-sales" class="sub-tab {% if active_menu == 'brand-sales' %}active{% endif %}">스토어매출</a>
         <a href="/place-rank" class="sub-tab {% if active_menu == 'place-rank' %}active{% endif %}">플레이스 순위</a>
+        <a href="/keyword-report" class="sub-tab {% if active_menu == 'keyword-report' %}active{% endif %}">키워드 리포트</a>
         {% elif is_coupang %}
         <a href="/coupang-rank" class="sub-tab {% if active_menu == 'coupang-rank' %}active{% endif %}">순위추적</a>
         <a href="/coupang-sales" class="sub-tab {% if active_menu == 'coupang-sales' %}active{% endif %}">매출조회</a>
