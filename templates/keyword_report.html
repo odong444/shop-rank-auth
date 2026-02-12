@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% block title %}키워드 리포트{% endblock %}
+
+{% block extra_css %}
+<style>
+.search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+.search-box .input { flex: 1; }
+.report-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+.card-title {
+    font-size: 0.938rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.card-title::before {
+    content: '';
+    width: 4px;
+    height: 16px;
+    background: var(--primary);
+    border-radius: 2px;
+}
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+.stat-box {
+    background: var(--bg-gray);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.stat-label {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-bottom: 4px;
+}
+.stat-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+.simple-table {
+    width: 100%;
+    font-size: 0.813rem;
+    border-collapse: collapse;
+}
+.simple-table th {
+    background: var(--bg-gray);
+    color: var(--text-gray);
+    font-weight: 600;
+    padding: 8px 6px;
+    text-align: left;
+    font-size: 0.75rem;
+}
+.simple-table td {
+    padding: 10px 6px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dark);
+}
+.product-card {
+    display: flex;
+    gap: 12px;
+    background: var(--bg-gray);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+.product-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.product-info { flex: 1; min-width: 0; }
+.product-title-text {
+    font-size: 0.813rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.product-meta {
+    font-size: 0.688rem;
+    color: var(--text-gray);
+    margin-bottom: 6px;
+}
+.product-scores {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.score-badge {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--text-gray);
+}
+.score-badge.high {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.btn-download {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.938rem;
+    width: 100%;
+    margin-top: 16px;
+}
+.btn-download:hover { background: var(--primary-light); }
+.empty-state {
+    text-align: center;
+    padding: 64px 16px;
+    color: var(--text-gray);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-box">
+    <input type="text" id="keywordInput" placeholder="키워드 입력 (예: 물티슈)" class="input">
+    <button onclick="analyzeKeyword()" id="searchBtn" class="btn btn-primary">분석</button>
+</div>
+
+<div id="loading" class="loading-box hidden">
+    <div class="spinner"></div>
+    <p class="mt-4 text-sm">분석 중...</p>
+</div>
+
+<div id="error" class="error-box hidden">
+    <p id="errorMsg"></p>
+</div>
+
+<div id="resultArea" class="hidden">
+    <div class="report-card">
+        <div class="card-title">📊 검색량</div>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">총 검색량</div>
+                <div class="stat-value" id="totalVolume">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">경쟁도</div>
+                <div class="stat-value" id="competition" style="font-size: 1rem;">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">PC</div>
+                <div class="stat-value" id="pcVolume" style="font-size: 0.938rem; color: var(--text-dark);">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">모바일</div>
+                <div class="stat-value" id="mobileVolume" style="font-size: 0.938rem; color: var(--text-dark);">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card">
+        <div class="card-title">📝 콘텐츠 수</div>
+        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="stat-box">
+                <div class="stat-label">블로그</div>
+                <div class="stat-value" id="blogCount" style="font-size: 0.875rem; color: var(--text-dark);">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">카페</div>
+                <div class="stat-value" id="cafeCount" style="font-size: 0.875rem; color: var(--text-dark);">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">쇼핑</div>
+                <div class="stat-value" id="shopCount" style="font-size: 0.875rem; color: var(--text-dark);">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-card">
+        <div class="card-title">🔗 연관 키워드 TOP 5</div>
+        <table class="simple-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">키워드</th>
+                    <th style="width: 30%; text-align: right;">검색량</th>
+                    <th style="width: 20%; text-align: center;">경쟁도</th>
+                </tr>
+            </thead>
+            <tbody id="relatedTable">
+                <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="report-card">
+        <div class="card-title">🏆 상위 상품 TOP 5</div>
+        <div id="productsArea">
+            <p style="text-align: center; color: var(--text-gray); padding: 24px 0;">데이터 없음</p>
+        </div>
+    </div>
+
+    <div class="report-card" id="salesCard" style="display: none;">
+        <div class="card-title">💰 월간 매출</div>
+        <table class="simple-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">스토어</th>
+                    <th style="width: 30%; text-align: right;">매출액</th>
+                    <th style="width: 30%; text-align: right;">판매건수</th>
+                </tr>
+            </thead>
+            <tbody id="salesTable">
+                <tr><td colspan="3" style="text-align: center; color: var(--text-gray);">로딩 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <button onclick="downloadPDF()" class="btn-download">📥 PDF로 다운로드</button>
+</div>
+
+<div id="emptyState" class="empty-state">
+    <div style="font-size: 3rem; margin-bottom: 12px;">🔍</div>
+    <p style="font-weight: 600; margin-bottom: 6px;">키워드를 입력하고 분석하세요</p>
+    <p style="font-size: 0.813rem;">검색량, 연관 키워드, 상위 상품, 매출 데이터를 한눈에!</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentData = null;
+
+function formatNumber(num) {
+    try { return parseInt(num).toLocaleString(); } catch { return num; }
+}
+
+async function analyzeKeyword() {
+    const keyword = document.getElementById('keywordInput').value.trim();
+    const btn = document.getElementById('searchBtn');
+    
+    if (!keyword) {
+        alert('키워드를 입력하세요');
+        return;
+    }
+    
+    document.getElementById('emptyState').classList.add('hidden');
+    document.getElementById('resultArea').classList.add('hidden');
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
+    btn.disabled = true;
+    btn.textContent = '분석 중...';
+    
+    try {
+        const response = await fetch('/api/keyword-report/analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({keyword: keyword})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            currentData = result.data;
+            displayResult(result.data);
+            
+            if (result.data.top_products && result.data.top_products.length > 0) {
+                fetchSalesData(result.data.top_products);
+            }
+        } else {
+            showError(result.error || '분석 실패');
+        }
+    } catch (err) {
+        console.error(err);
+        showError('서버 연결 실패');
+    } finally {
+        document.getElementById('loading').classList.add('hidden');
+        btn.disabled = false;
+        btn.textContent = '분석';
+    }
+}
+
+function displayResult(data) {
+    const sv = data.search_volume;
+    document.getElementById('totalVolume').textContent = formatNumber(sv.total || 0);
+    document.getElementById('pcVolume').textContent = formatNumber(sv.pc || 0);
+    document.getElementById('mobileVolume').textContent = formatNumber(sv.mobile || 0);
+    document.getElementById('competition').textContent = sv.competition || '-';
+    
+    const cc = data.content_counts;
+    document.getElementById('blogCount').textContent = formatNumber(cc.blog || 0);
+    document.getElementById('cafeCount').textContent = formatNumber(cc.cafe || 0);
+    document.getElementById('shopCount').textContent = formatNumber(cc.shop || 0);
+    
+    const relatedTable = document.getElementById('relatedTable');
+    if (data.related_keywords && data.related_keywords.length > 0) {
+        relatedTable.innerHTML = data.related_keywords.slice(0, 5).map(kw => `
+            <tr>
+                <td>${kw.keyword}</td>
+                <td style="text-align: right;">${formatNumber(kw.volume)}</td>
+                <td style="text-align: center;">${kw.competition}</td>
+            </tr>
+        `).join('');
+    } else {
+        relatedTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">데이터 없음</td></tr>';
+    }
+    
+    const productsArea = document.getElementById('productsArea');
+    if (data.top_products && data.top_products.length > 0) {
+        productsArea.innerHTML = data.top_products.map(p => `
+            <div class="product-card">
+                <img src="${p.image || ''}" class="product-img" onerror="this.style.display='none'">
+                <div class="product-info">
+                    <div class="product-title-text">${p.title}</div>
+                    <div class="product-meta">${p.mall} · ${formatNumber(p.price)}원</div>
+                    <div class="product-scores">
+                        <span class="score-badge ${p.relevance >= 4 ? 'high' : ''}">종합 ${p.relevance}</span>
+                        <span class="score-badge ${p.hit >= 4 ? 'high' : ''}">인기 ${p.hit}</span>
+                        <span class="score-badge ${p.sale >= 4 ? 'high' : ''}">판매 ${p.sale}</span>
+                        <span class="score-badge">리뷰 ${formatNumber(p.review_cnt)}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        productsArea.innerHTML = '<p style="text-align: center; color: var(--text-gray); padding: 24px 0;">데이터 없음</p>';
+    }
+    
+    document.getElementById('resultArea').classList.remove('hidden');
+}
+
+async function fetchSalesData(products) {
+    const salesCard = document.getElementById('salesCard');
+    const salesTable = document.getElementById('salesTable');
+    
+    salesCard.style.display = 'block';
+    salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">조회 중...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/keyword-report/sales', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({products: products})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.sales && result.sales.length > 0) {
+            salesTable.innerHTML = result.sales.map(s => `
+                <tr>
+                    <td>${s.mall}</td>
+                    <td style="text-align: right;">${formatNumber(s.amount)}원</td>
+                    <td style="text-align: right;">${formatNumber(s.count)}건</td>
+                </tr>
+            `).join('');
+        } else {
+            salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-gray);">매출 데이터 없음</td></tr>';
+        }
+    } catch (err) {
+        console.error(err);
+        salesTable.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #EF4444;">조회 실패</td></tr>';
+    }
+}
+
+function showError(msg) {
+    document.getElementById('error').classList.remove('hidden');
+    document.getElementById('errorMsg').textContent = msg;
+}
+
+function downloadPDF() {
+    if (!currentData) {
+        alert('분석 결과가 없습니다');
+        return;
+    }
+    window.print();
+}
+
+document.getElementById('keywordInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') analyzeKeyword();
+});
+</script>
+{% endblock %}
