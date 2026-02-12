@@ -142,41 +142,74 @@ def use_product_score():
 @product_score_bp.route('/api/product-score/search', methods=['GET'])
 @login_required
 def search_product_index():
-    """키워드로 상품 검색 + 상품지수 조회"""
+    """키워드로 상품 검색 + 상품지수 조회 (로컬 서버 직접 호출)"""
     keyword = request.args.get('keyword')
     if not keyword:
         return jsonify({'success': False, 'message': '키워드를 입력해주세요.'})
 
-    # 1. 네이버 API로 상품 목록 조회 (MID 포함)
-    products = get_naver_search_results(keyword)
-    if not products:
-        return jsonify({'success': False, 'message': '검색 결과가 없습니다.'})
+    if not RANK_API_URL:
+        return jsonify({'success': False, 'message': '로컬 서버 URL이 설정되지 않았습니다.'})
 
-    # 2. MID 목록 추출 (상위 50개만)
-    mids = [p['mid'] for p in products[:50]]
+    try:
+        # 로컬 서버의 /api/product-score 엔드포인트 호출 (키워드 한번에 100개 상품+지수)
+        response = requests.get(
+            f"{RANK_API_URL}/api/product-score",
+            params={"keyword": keyword},
+            timeout=30
+        )
 
-    # 3. 로컬 서버에서 상품지수 조회
-    indices = get_product_indices_from_local(mids)
+        if response.status_code == 200:
+            data = response.json()
+            
+            # 네이버 응답 구조: {"result": {"products": [...]}}
+            products = data.get('result', {}).get('products', [])
+            
+            if not products:
+                return jsonify({'success': False, 'message': '검색 결과가 없습니다.'})
 
-    # 4. 결과 병합
-    results = []
-    for p in products[:50]:
-        mid = p['mid']
-        item = {
-            'rank': p['rank'],
-            'mid': mid,
-        }
+            # 상위 50개만 반환 (프론트엔드 표시 제한)
+            results = []
+            for i, p in enumerate(products[:50], 1):
+                item = {
+                    'rank': i,  # 순위는 1부터 시작
+                    'mid': str(p.get('nvmid', '')),
+                    'productTitle': p.get('productTitle', ''),
+                    'imageUrl': p.get('imageUrl', ''),
+                    'mallName': p.get('mallName', ''),
+                    'lowPrice': p.get('lowPrice', 0),
+                    'reviewCount': p.get('reviewCount', 0),
+                    'keepCnt': p.get('keepCnt', 0),
+                    'purchaseCnt': p.get('purchaseCnt', 0),
+                    'category': p.get('category', ''),
+                    # 상품지수
+                    'relevanceStarScore': p.get('relevanceStarScore', 0),
+                    'similarityStarScore': p.get('similarityStarScore', 0),
+                    'hitStarScore': p.get('hitStarScore', 0),
+                    'qualityStarScore': p.get('qualityStarScore', 0),
+                    'saleStarScore': p.get('saleStarScore', 0),
+                    'reviewCountStarScore': p.get('reviewCountStarScore', 0),
+                    'recentStarScore': p.get('recentStarScore', 0),
+                    'abuseStarScore': p.get('abuseStarScore', 0),
+                    'reliabilityType': p.get('reliabilityType', ''),
+                    'rankDownScoreType': p.get('rankDownScoreType', ''),
+                }
+                results.append(item)
 
-        # 상품지수 데이터 병합 (로컬 서버에서 온 모든 필드)
-        if indices and mid in indices:
-            idx = indices[mid]
-            item.update(idx)
+            return jsonify({
+                'success': True,
+                'keyword': keyword,
+                'total': len(results),
+                'products': results
+            })
 
-        results.append(item)
+        elif response.status_code == 401:
+            return jsonify({'success': False, 'message': '로컬 서버 쿠키 만료. 재로그인이 필요합니다.'})
+        else:
+            return jsonify({'success': False, 'message': f'로컬 서버 오류: {response.status_code}'})
 
-    return jsonify({
-        'success': True,
-        'keyword': keyword,
-        'total': len(results),
-        'products': results
-    })
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'message': '로컬 서버 응답 시간 초과'})
+    except requests.exceptions.ConnectionError:
+        return jsonify({'success': False, 'message': '로컬 서버에 연결할 수 없습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'오류: {str(e)}'})
