@@ -202,7 +202,7 @@ def fetch_sales():
     try:
         data = request.get_json()
         products = data.get('products', [])
-        period = data.get('period', 'monthly')  # monthly 또는 daily
+        period = data.get('period', 'monthly')
         
         if not products:
             return jsonify({"success": False, "error": "상품 데이터가 필요합니다"}), 400
@@ -215,7 +215,23 @@ def fetch_sales():
             mall_name = product.get('mall', '-')
             product_title = product.get('title', '')
             
-            if not mall_seq:
+            # ★ 가격비교 상품: mallSeq가 없으면(0) catalog-seller로 찾기
+            if not mall_seq or str(mall_seq) == '0':
+                try:
+                    seller_resp = requests.get(
+                        f"{RANK_API_URL}/api/catalog-seller",
+                        params={"title": product_title},
+                        timeout=15
+                    )
+                    if seller_resp.status_code == 200:
+                        seller_data = seller_resp.json()
+                        if seller_data.get('success'):
+                            mall_seq = seller_data['mall_seq']
+                            mall_name = seller_data.get('mall_name', mall_name)
+                except Exception as e:
+                    print(f"[Catalog Seller Error] {product_title}: {e}")
+            
+            if not mall_seq or str(mall_seq) == '0':
                 continue
             
             try:
