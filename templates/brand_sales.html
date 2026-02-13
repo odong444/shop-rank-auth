@@ -144,7 +144,10 @@
         </div>
 
         <div class="flex items-center justify-between mb-3">
-            <p id="storeUrlDisplay" class="store-url" style="margin-bottom: 0;"></p>
+            <div>
+                <p id="storeUrlDisplay" class="store-url" style="margin-bottom: 4px;"></p>
+                <p id="periodDisplay" class="text-xs" style="color: var(--primary); font-weight: 600; margin-bottom: 0;"></p>
+            </div>
             <button id="downloadCsvBtn" onclick="downloadCsv()" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.75rem;">CSV 다운로드</button>
         </div>
         <p id="productCount" class="text-xs text-gray mb-3"></p>
@@ -183,6 +186,29 @@ let canUseService = true;
 let currentProducts = [];
 let currentSummary = {};
 let currentStoreUrl = '';
+
+function getPeriodText(period) {
+    const today = new Date();
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}.${month}.${day}`;
+    };
+
+    if (period === 'daily') {
+        return `📅 조회 기준: 오늘 (${formatDate(today)})`;
+    } else if (period === 'weekly') {
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 6);
+        return `📅 조회 기준: 최근 7일 (${formatDate(weekAgo)} ~ ${formatDate(today)})`;
+    } else if (period === 'monthly') {
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 29);
+        return `📅 조회 기준: 최근 30일 (${formatDate(monthAgo)} ~ ${formatDate(today)})`;
+    }
+    return '';
+}
 
 function getUserFriendlyError(error) {
     if (!error) return '조회에 실패했습니다.';
@@ -303,6 +329,11 @@ function displayResults(data) {
     document.getElementById('productCount').textContent = products.length + '개 상품';
     document.getElementById('storeUrlDisplay').textContent = data.store_url || '';
 
+    // 조회 기간 표시
+    const period = document.getElementById('period').value;
+    const periodText = getPeriodText(period);
+    document.getElementById('periodDisplay').textContent = periodText;
+
     const tbody = document.getElementById('salesBody');
     tbody.innerHTML = '';
 
@@ -335,6 +366,9 @@ function downloadCsv() {
         return;
     }
 
+    const period = document.getElementById('period').value;
+    const periodText = getPeriodText(period).replace('📅 조회 기준: ', '');
+
     const headers = ['순번', '상품명', '매출액', '판매수', '클릭수', '전환율(%)'];
 
     const rows = currentProducts.map((p, idx) => {
@@ -352,6 +386,7 @@ function downloadCsv() {
     // 요약 정보 추가
     rows.push([]);
     rows.push(['[요약]']);
+    rows.push(['조회 기간', `"${periodText}"`]);
     rows.push(['총 매출', currentSummary.total_amount || 0]);
     rows.push(['총 판매', currentSummary.total_count || 0]);
     rows.push(['총 클릭', currentSummary.total_clicks || 0]);
