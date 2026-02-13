@@ -197,15 +197,25 @@ function getPeriodText(period) {
     };
 
     if (period === 'daily') {
-        return `📅 조회 기준: 오늘 (${formatDate(today)})`;
+        // 어제 하루
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        return `📅 조회 기준: 어제 (${formatDate(yesterday)})`;
     } else if (period === 'weekly') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 6);
-        return `📅 조회 기준: 최근 7일 (${formatDate(weekAgo)} ~ ${formatDate(today)})`;
+        // 지난주 월~일 (가장 최근 완료된 주)
+        const daysSinceMonday = today.getDay() === 0 ? 6 : today.getDay() - 1; // 일요일=0 처리
+        const lastSunday = new Date(today);
+        lastSunday.setDate(today.getDate() - daysSinceMonday - 1);
+        const lastMonday = new Date(lastSunday);
+        lastMonday.setDate(lastSunday.getDate() - 6);
+        return `📅 조회 기준: 지난주 (${formatDate(lastMonday)} ~ ${formatDate(lastSunday)})`;
     } else if (period === 'monthly') {
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 29);
-        return `📅 조회 기준: 최근 30일 (${formatDate(monthAgo)} ~ ${formatDate(today)})`;
+        // 지난달 1일 ~ 말일
+        const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastOfPrevMonth = new Date(firstOfThisMonth);
+        lastOfPrevMonth.setDate(0); // 이전 달 마지막 날
+        const firstOfPrevMonth = new Date(lastOfPrevMonth.getFullYear(), lastOfPrevMonth.getMonth(), 1);
+        return `📅 조회 기준: 지난달 (${formatDate(firstOfPrevMonth)} ~ ${formatDate(lastOfPrevMonth)})`;
     }
     return '';
 }
