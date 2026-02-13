@@ -407,6 +407,7 @@ function renderCards() {
             </div>
             
             <div class="place-card-actions">
+                <button class="btn btn-primary btn-xs" onclick="refreshSingle(${p.id})" id="refresh-btn-${p.id}">↻</button>
                 <button class="btn btn-outline btn-xs" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
                 <button class="btn btn-danger btn-xs" onclick="deletePlace(${p.id})">삭제</button>
             </div>
@@ -496,6 +497,28 @@ async function checkSingleRank(pid) {
         }
     } catch(e) {
         console.error(e);
+    }
+}
+
+async function refreshSingle(pid) {
+    const btn = document.getElementById('refresh-btn-' + pid);
+    const rankEl = document.getElementById('rank-' + pid);
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '...';
+    }
+    if (rankEl) {
+        rankEl.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>';
+    }
+
+    try {
+        await checkSingleRank(pid);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '↻';
+        }
     }
 }
 

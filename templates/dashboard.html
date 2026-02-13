@@ -394,6 +394,7 @@ function renderTable() {
             <td>${formatRank(p.prev_rank)}</td>
             <td id="rank-${p.id}">${todayHtml}</td>
             <td class="action-cell">
+                <button class="btn btn-primary btn-xs" onclick="refreshSingle(${p.id})" id="refresh-btn-${p.id}">↻</button>
                 <button class="btn btn-outline btn-xs" onclick="showHistory(${p.id},'${p.keyword}')">이력</button>
                 <button class="btn btn-danger btn-xs" onclick="deleteProduct(${p.id})">삭제</button>
             </td>`;
@@ -486,6 +487,28 @@ async function checkSingleRank(pid) {
         }
     } catch(e) {
         console.error(e);
+    }
+}
+
+async function refreshSingle(pid) {
+    const btn = document.getElementById('refresh-btn-' + pid);
+    const rankCell = document.getElementById('rank-' + pid);
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '...';
+    }
+    if (rankCell) {
+        rankCell.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>';
+    }
+
+    try {
+        await checkSingleRank(pid);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '↻';
+        }
     }
 }
 
