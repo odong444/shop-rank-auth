@@ -99,14 +99,30 @@ def update_all_products_with_keyword(keyword, results, user_id=None):
             r = mid_map[mid]
             rank_str = str(r['rank'])
             new_first = first_rank if first_rank != '-' else rank_str
-            cur.execute('''UPDATE products SET prev_rank=current_rank, current_rank=%s, 
-                          title=COALESCE(NULLIF(%s,''),title), mall=COALESCE(NULLIF(%s,''),mall),
-                          first_rank=%s, last_checked=NOW() WHERE id=%s''',
+            # 어제 순위: 마지막 체크가 오늘이 아니면 prev_rank를 current_rank로 업데이트
+            cur.execute('''UPDATE products SET 
+                          prev_rank = CASE 
+                            WHEN DATE(last_checked) < CURRENT_DATE THEN current_rank 
+                            ELSE prev_rank 
+                          END,
+                          current_rank=%s, 
+                          title=COALESCE(NULLIF(%s,''),title), 
+                          mall=COALESCE(NULLIF(%s,''),mall),
+                          first_rank=%s, 
+                          last_checked=NOW() 
+                          WHERE id=%s''',
                        (rank_str, r['title'], r['mall'], new_first, pid))
             cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, rank_str))
             updated += 1
         else:
-            cur.execute('''UPDATE products SET prev_rank=current_rank, current_rank=%s, last_checked=NOW() WHERE id=%s''',
+            cur.execute('''UPDATE products SET 
+                          prev_rank = CASE 
+                            WHEN DATE(last_checked) < CURRENT_DATE THEN current_rank 
+                            ELSE prev_rank 
+                          END,
+                          current_rank=%s, 
+                          last_checked=NOW() 
+                          WHERE id=%s''',
                        ('300위 밖', pid))
             cur.execute('INSERT INTO rank_history (product_id, rank) VALUES (%s, %s)', (pid, '300위 밖'))
             updated += 1

@@ -180,10 +180,17 @@ def check_single_rank(pid):
         # 업체명: 기존 값이 있으면 유지, 없으면 새로 가져온 값 사용
         final_title = existing_title if existing_title else (title or '')
         
-        # DB 업데이트
+        # DB 업데이트 (어제 순위: 마지막 체크가 오늘이 아니면 업데이트)
         cur.execute('''
             UPDATE place_ranks 
-            SET title=%s, first_rank=%s, current_rank=%s, last_checked=NOW()
+            SET title=%s, 
+                first_rank=%s, 
+                prev_rank = CASE 
+                  WHEN DATE(last_checked) < CURRENT_DATE THEN current_rank 
+                  ELSE prev_rank 
+                END,
+                current_rank=%s, 
+                last_checked=NOW()
             WHERE id=%s
         ''', (final_title, first_rank, rank_str, pid))
         
@@ -247,7 +254,7 @@ def refresh_ranks():
                     failed += 1
                     continue
                 
-                first_rank, prev_rank, existing_title = row
+                first_rank, current_rank, existing_title = row
                 
                 # 최초 순위 설정
                 if first_rank == '-':
@@ -256,12 +263,19 @@ def refresh_ranks():
                 # 업체명: 기존 값이 있으면 유지, 없으면 새로 가져온 값 사용
                 final_title = existing_title if existing_title else (title or '')
                 
-                # 업데이트
+                # 업데이트 (어제 순위: 마지막 체크가 오늘이 아니면 업데이트)
                 cur.execute('''
                     UPDATE place_ranks
-                    SET title=%s, first_rank=%s, prev_rank=%s, current_rank=%s, last_checked=NOW()
+                    SET title=%s, 
+                        first_rank=%s, 
+                        prev_rank = CASE 
+                          WHEN DATE(last_checked) < CURRENT_DATE THEN current_rank 
+                          ELSE prev_rank 
+                        END,
+                        current_rank=%s, 
+                        last_checked=NOW()
                     WHERE id=%s AND user_id=%s
-                ''', (final_title, first_rank, prev_rank, rank_str, pid, session['user_id']))
+                ''', (final_title, first_rank, rank_str, pid, session['user_id']))
                 
                 # 이력 저장
                 cur.execute('''
@@ -400,7 +414,7 @@ def export_excel():
         
         output = io.StringIO()
         w = csv.writer(output)
-        w.writerow(['업체명', '플레이스ID', '키워드', '최초순위', '이전순위', '현재순위'])
+        w.writerow(['업체명', '플레이스ID', '키워드', '최초순위', '어제순위', '현재순위'])
         for r in rows:
             w.writerow([
                 r[0] or '',

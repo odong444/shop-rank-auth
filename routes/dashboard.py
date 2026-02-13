@@ -362,7 +362,7 @@ def export_excel():
         
         output = io.StringIO()
         w = csv.writer(output)
-        w.writerow(['스토어명', '상품명', 'MID', '키워드', '최초순위', '이전순위', '오늘순위'])
+        w.writerow(['스토어명', '상품명', 'MID', '키워드', '최초순위', '어제순위', '오늘순위'])
         for r in rows:
             w.writerow([r[0] or '', r[1] or '', r[2], r[3], r[4] or '-', r[5] or '-', r[6] or '-'])
         output.seek(0)
