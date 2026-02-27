@@ -94,6 +94,12 @@
 {% endblock %}
 
 {% block content %}
+<!-- 업데이트 중 안내 -->
+<div class="card" style="background: #FFF7ED; border: 1px solid #FB923C; text-align: center; padding: 20px;">
+    <p style="font-size: 1rem; font-weight: 700; color: #EA580C; margin-bottom: 6px;">서비스 업데이트 중</p>
+    <p style="font-size: 0.813rem; color: #9A3412; margin-bottom: 0;">네이버 측 서비스 점검으로 현재 스토어매출 조회가 일시 중단되었습니다.<br>복구되는 대로 다시 안내드리겠습니다.</p>
+</div>
+
 <!-- 상태 표시 -->
 <div class="status-bar">
     <span id="usageInfo"></span>
@@ -105,15 +111,15 @@
 </div>
 
 <!-- 검색 -->
-<div class="card">
+<div class="card" style="opacity: 0.5; pointer-events: none;">
     <div class="search-box">
-        <input type="text" id="storeUrl" placeholder="스토어 URL 입력" class="input">
-        <select id="period" class="select">
+        <input type="text" id="storeUrl" placeholder="스토어 URL 입력" class="input" disabled>
+        <select id="period" class="select" disabled>
             <option value="daily">일간</option>
             <option value="weekly">주간</option>
             <option value="monthly">월간</option>
         </select>
-        <button onclick="searchSales()" id="searchBtn" class="btn btn-primary">조회</button>
+        <button onclick="searchSales()" id="searchBtn" class="btn btn-primary" disabled>조회</button>
     </div>
     <p class="hint">* 로컬 서버 필요</p>
 </div>
